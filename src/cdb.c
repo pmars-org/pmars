@@ -439,9 +439,9 @@ cdb(message)
     case CA_H:                        /* calculate */
       if (argType == RANGE_T) {
         if (!commaSep)
-          sprintf(outs, "%ld\n", start);
+          snprintf(outs, sizeof(outs), "%ld\n", start);
         else
-          sprintf(outs, "%ld,%ld\n", start, stop);
+          snprintf(outs, sizeof(outs), "%ld,%ld\n", start, stop);
         cdb_fputs(outs, COND);
       } else
         bad_arg(argStr);
@@ -616,7 +616,7 @@ cdb(message)
 #endif /* CLO_H */
     case ECH_H:
     case EC_H:
-      sprintf(outs, "%s\n", argStr);
+      snprintf(outs, sizeof(outs), "%s\n", argStr);
       cdb_fputs(outs, COND);
       break;
     case EDI_H:
@@ -655,7 +655,7 @@ cdb(message)
                                  * commands */
       for (i = 0; argStr[i]; ++i)
         argStr[i] = toupper_(argStr[i]);
-      sprintf(outs, "#define %s_H %d\n", argStr, hash_str(argStr, VERBLEN));
+      snprintf(outs, sizeof(outs), "#define %s_H %d\n", argStr, hash_str(argStr, VERBLEN));
       cdb_fputs(outs, COND);
       break;
     case HEL_H:
@@ -1027,7 +1027,7 @@ cdb(message)
       print_core(curAddr, curAddr);
       break;
     default:
-      sprintf(outs, unknownCommand, cmdStr);
+      snprintf(outs, sizeof(outs), unknownCommand, cmdStr);
       cdb_fputs(outs, FORCE);
       break;
     }                                /* switch */
@@ -1544,7 +1544,7 @@ void
 bad_arg(argStr)
   char   *argStr;
 {
-  sprintf(outs, badArgument, argStr);
+  snprintf(outs, sizeof(outs), badArgument, argStr);
   cdb_fputs(outs, FORCE);
 }
 /*---------------------------------------------------------------------------
@@ -1619,11 +1619,11 @@ subst_eval(inpStr, result)
   } else
     strcpy(buf[bi1], inpStr);
 
-  sprintf(outs, "%d", curAddr);
+  snprintf(outs, sizeof(outs), "%d", curAddr);
   substitute(buf[bi1], ".", outs, buf[bi2]);
 
   SWITCHBI;
-  sprintf(outs, "%d", (targetID == QUEUE && !QW->tasks ?
+  snprintf(outs, sizeof(outs), "%d", (targetID == QUEUE && !QW->tasks ?
                        targetSize - 2 : targetSize - 1));
   substitute(buf[bi1], "$", outs, buf[bi2]);
 
@@ -1632,15 +1632,15 @@ subst_eval(inpStr, result)
   if (*pos) {
 
     SWITCHBI;
-    sprintf(outs, "%d", targetID == PSP ? QW->pSpaceIndex : memory[targetSelect(curAddr)].A_value);
+    snprintf(outs, sizeof(outs), "%d", targetID == PSP ? QW->pSpaceIndex : memory[targetSelect(curAddr)].A_value);
     substitute(buf[bi1], "A", outs, buf[bi2]);
 
     SWITCHBI;
-    sprintf(outs, "%d", targetID == PSP ? QW->pSpaceIndex : memory[targetSelect(curAddr)].B_value);
+    snprintf(outs, sizeof(outs), "%d", targetID == PSP ? QW->pSpaceIndex : memory[targetSelect(curAddr)].B_value);
     substitute(buf[bi1], "B", outs, buf[bi2]);
 
     for (i = warriors - 1; i >= 0; --i) {
-      sprintf(outs, "%d", (targetID == QUEUE || targetID == PSP ?
+      snprintf(outs, sizeof(outs), "%d", (targetID == QUEUE || targetID == PSP ?
                            0 : (targetID == WARRIOR ?
                  i : (W - warrior == i ? progCnt : *warrior[i].taskHead))));
       sprintf(outs2, "PC%d", i + 1);
@@ -1648,7 +1648,7 @@ subst_eval(inpStr, result)
       substitute(buf[bi1], outs2, outs, buf[bi2]);
     }
     if (warriors < MAXWARRIOR) {/* PCN where N==warriors is PC */
-      sprintf(outs, "%d", (targetID == QUEUE || targetID == PSP ?
+      snprintf(outs, sizeof(outs), "%d", (targetID == QUEUE || targetID == PSP ?
                            0 : (targetID == WARRIOR ?
                                 W - warrior : progCnt)));
       sprintf(outs2, "PC%d", warriors);
@@ -1656,50 +1656,50 @@ subst_eval(inpStr, result)
       substitute(buf[bi1], outs2, outs, buf[bi2]);
     }
     SWITCHBI;
-    sprintf(outs, "%d", (targetID == QUEUE || targetID == PSP ?
+    snprintf(outs, sizeof(outs), "%d", (targetID == QUEUE || targetID == PSP ?
                          0 : (targetID == WARRIOR ?
                               W - warrior : progCnt)));
     substitute(buf[bi1], "PC", outs, buf[bi2]);
     SWITCHBI;
-    sprintf(outs, "%d", (cycle + (warriorsLeft ? warriorsLeft : 1) - 1) /
+    snprintf(outs, sizeof(outs), "%d", (cycle + (warriorsLeft ? warriorsLeft : 1) - 1) /
             (warriorsLeft ? warriorsLeft : 1));
     substitute(buf[bi1], "CYCLE", outs, buf[bi2]);
     SWITCHBI;
-    sprintf(outs, "%d", round_num);
+    snprintf(outs, sizeof(outs), "%d", round_num);
     substitute(buf[bi1], "ROUND", outs, buf[bi2]);
 
     SWITCHBI;
 #if defined(DOSALLGRAPHX)
     if (displayMode != TEXT)
-      sprintf(outs, "%d", bgiTextLines - 1);
+      snprintf(outs, sizeof(outs), "%d", bgiTextLines - 1);
     else
-      sprintf(outs, "%d", screenY - 2);
+      snprintf(outs, sizeof(outs), "%d", screenY - 2);
 #else
 #if defined(DOSGRXGRAPHX)
-    sprintf(outs, "%d", bgiTextLines - 1);
+    snprintf(outs, sizeof(outs), "%d", bgiTextLines - 1);
 #else
 #if defined(CURSESGRAPHX)
-    sprintf(outs, "%d", LINES);
+    snprintf(outs, sizeof(outs), "%d", LINES);
 #else
 #if defined(DOSTXTGRAPHX)
-    sprintf(outs, "%d", screenY - 2);
+    snprintf(outs, sizeof(outs), "%d", screenY - 2);
 #else
 #if defined(MACGRAPHX)
-    sprintf(outs, "%d", mac_text_lines());
+    snprintf(outs, sizeof(outs), "%d", mac_text_lines());
 #else
 #if defined(LINUXGRAPHX)
-    sprintf(outs, "%d", svgaTextLines);
+    snprintf(outs, sizeof(outs), "%d", svgaTextLines);
 #else
 #if defined(XWINGRAPHX)
-    sprintf(outs, "%d", xWinTextLines);
+    snprintf(outs, sizeof(outs), "%d", xWinTextLines);
 #else
 #if defined(SDLGRAPHX)
-    sprintf(outs, "%d", sdlgr_text_lines());
+    snprintf(outs, sizeof(outs), "%d", sdlgr_text_lines());
 #else
 #if defined(STDGRAPHX)
-    sprintf(outs, "%d", stdio_text_lines());
+    snprintf(outs, sizeof(outs), "%d", stdio_text_lines());
 #else
-    sprintf(outs, "%d", TEXTLINES);
+    snprintf(outs, sizeof(outs), "%d", TEXTLINES);
 #endif /* STD */
 #endif /* SDL */
 #endif /* X11 */
@@ -2000,13 +2000,13 @@ print_registers()
 #endif
   int     nFuture, nPast, count, taskHalf = (coreSize <= 10000 ? 7 : 5);
 
-  sprintf(outs, roundOfCycle, round_num, rounds,
+  snprintf(outs, sizeof(outs), roundOfCycle, round_num, rounds,
           (cycle + (warriorsLeft ? warriorsLeft : 1) - 1) /
           (warriorsLeft ? warriorsLeft : 1));
   cdb_fputs(outs, COND);
-  sprintf(outs, currentlyExecutingWarrior, W - warrior, W->name);
+  snprintf(outs, sizeof(outs), currentlyExecutingWarrior, W - warrior, W->name);
   cdb_fputs(outs, COND);
-  sprintf(outs, processesActive, W->tasks);
+  snprintf(outs, sizeof(outs), processesActive, W->tasks);
   cdb_fputs(outs, COND);
 
   if (W->tasks > (taskHalf * 2)) {
@@ -2021,7 +2021,7 @@ print_registers()
   else
     thisProc = W->taskTail - nPast;
   for (count = nPast; --count >= 0; ) {
-    sprintf(outs, "%d ", *thisProc);
+    snprintf(outs, sizeof(outs), "%d ", *thisProc);
     cdb_fputs(outs, COND);
 #ifdef DOS16
     ++thisProc;
@@ -2031,10 +2031,10 @@ print_registers()
 #endif
   }
   if (W->tasks) {
-    sprintf(outs, "[%d]-> ", progCnt);
+    snprintf(outs, sizeof(outs), "[%d]-> ", progCnt);
     cdb_fputs(outs, COND);
     for (thisProc = W->taskHead, count = 1; count < nFuture; count++) {
-      sprintf(outs, "%d ", *thisProc);
+      snprintf(outs, sizeof(outs), "%d ", *thisProc);
       cdb_fputs(outs, COND);
 #ifdef DOS16
       ++thisProc;
@@ -2048,18 +2048,18 @@ print_registers()
     cdb_fputs("..", COND);
   cdb_fputs("\n", COND);
 #ifdef PSPACE
-  sprintf(outs, "P-space[%d]: <%d> ", W->pSpaceIndex, W->lastResult);
+  snprintf(outs, sizeof(outs), "P-space[%d]: <%d> ", W->pSpaceIndex, W->lastResult);
   cdb_fputs(outs, COND);
   for (count = 1; count < 10; ++count) {
-    sprintf(outs, "%d ", *(pSpace[W->pSpaceIndex] + count));
+    snprintf(outs, sizeof(outs), "%d ", *(pSpace[W->pSpaceIndex] + count));
     cdb_fputs(outs, COND);
   }
   cdb_fputs("..\n", COND);
 #endif /* PSPACE */
   if (warriors == 2) {
-    sprintf(outs, otherWarrior, W2->name);
+    snprintf(outs, sizeof(outs), otherWarrior, W2->name);
     cdb_fputs(outs, COND);
-    sprintf(outs, processesActive, W2->tasks);
+    snprintf(outs, sizeof(outs), processesActive, W2->tasks);
     cdb_fputs(outs, COND);
     if (W2->tasks < (taskHalf * 2)) {
       nPast = W2->tasks >> 1;
@@ -2073,7 +2073,7 @@ print_registers()
     else
       thisProc = W2->taskTail - nPast;
     for (; thisProc < W2->taskTail;) {
-      sprintf(outs, "%d ", *thisProc);
+      snprintf(outs, sizeof(outs), "%d ", *thisProc);
       cdb_fputs(outs, COND);
 #ifdef DOS16
       ++thisProc;
@@ -2083,7 +2083,7 @@ print_registers()
 #endif
     }
     thisProc = W2->taskHead;
-    sprintf(outs, "[%d]-> ", *thisProc);
+    snprintf(outs, sizeof(outs), "[%d]-> ", *thisProc);
     cdb_fputs(outs, COND);
     for (count = 1; count < nFuture; count++) {
 #ifdef DOS16
@@ -2092,17 +2092,17 @@ print_registers()
       if (++thisProc == endQueue)
         thisProc = taskQueue;
 #endif
-      sprintf(outs, "%d ", *thisProc);
+      snprintf(outs, sizeof(outs), "%d ", *thisProc);
       cdb_fputs(outs, COND);
     }
     if (W2->tasks > (taskHalf * 2))
       cdb_fputs("..", COND);
     cdb_fputs("\n", COND);
 #ifdef PSPACE
-    sprintf(outs, "P-space[%d]: <%d> ", W2->pSpaceIndex, W2->lastResult);
+    snprintf(outs, sizeof(outs), "P-space[%d]: <%d> ", W2->pSpaceIndex, W2->lastResult);
     cdb_fputs(outs, COND);
     for (count = 1; count < 10; ++count) {
-      sprintf(outs, "%d ", *(pSpace[W2->pSpaceIndex] + count));
+      snprintf(outs, sizeof(outs), "%d ", *(pSpace[W2->pSpaceIndex] + count));
       cdb_fputs(outs, COND);
     }
     cdb_fputs("..\n", COND);
@@ -2112,12 +2112,12 @@ print_registers()
     warrior_struct *TW;
     for (TW = warrior; TW < warrior + warriors; ++TW)
       if (TW != W) {
-        sprintf(outs, warriorAtAddressHasActiveProcesses, TW - warrior,
+        snprintf(outs, sizeof(outs), warriorAtAddressHasActiveProcesses, TW - warrior,
                 TW->name, *TW->taskHead, TW->tasks,
                 (TW->tasks == 1 ? "" : pluralEndingOfProcess));
         cdb_fputs(outs, COND);
       }
-    sprintf(outs, ofWarriorsAreAlive, warriorsLeft, warriors);
+    snprintf(outs, sizeof(outs), ofWarriorsAreAlive, warriorsLeft, warriors);
     cdb_fputs(outs, COND);
   }
 }
@@ -2138,14 +2138,14 @@ edit_core(start, stop)
   do {
     cdb_fputs((*targetview) (start, outs), COND);
     if (targetID == QUEUE)
-      sprintf(outs, "%-4d->%05d   ", start, queue(start));
+      snprintf(outs, sizeof(outs), "%-4d->%05d   ", start, queue(start));
     else if (targetID == WARRIOR)
-      sprintf(outs, "#%-2d:  %05d   ", start,
+      snprintf(outs, sizeof(outs), "#%-2d:  %05d   ", start,
               (W - warrior == start ? progCnt : *warrior[start].taskHead));
     else if (targetID == PSP)
-      sprintf(outs, "[%4d]=", start);
+      snprintf(outs, sizeof(outs), "[%4d]=", start);
     else                        /* targetID == CORE */
-      sprintf(outs, "%05d   ", start);
+      snprintf(outs, sizeof(outs), "%05d   ", start);
 
     cdb_fputs(outs, COND);
     xInpP = get_cmd("");
@@ -2324,7 +2324,7 @@ load_macros(fnStr)
 #endif                                /* DJGPP */
 #endif				      /* CURSES */
   } else if ((mfp = open_macro_file(fnStr)) == NULL) {
-    sprintf(outs, cannotOpenMacroFile, fnStr);
+    snprintf(outs, sizeof(outs), cannotOpenMacroFile, fnStr);
     cdb_fputs(outs, FORCE);
     return;
   }
@@ -2529,7 +2529,7 @@ exec_macro(macro)
     if ((nextMacro = match_macro(macro, macroTab[macroIdx])) != NULL)
       break;
   if (!nextMacro) {
-    sprintf(outs, unknownMacro, macro);
+    snprintf(outs, sizeof(outs), unknownMacro, macro);
     cdb_fputs(outs, FORCE);
   }
 #ifdef CYCLE_CHECK
@@ -2657,21 +2657,21 @@ results(outp)
 #if defined(DOSALLGRAPHX)
   if ((displayMode == TEXT) && !outp) {
     for (i = 0; i < warriors; ++i) {
-      sprintf(outs, nameByAuthorScores, warrior[idxV[i]].name, warrior[idxV[i]].authorName,
+      snprintf(outs, sizeof(outs), nameByAuthorScores, warrior[idxV[i]].name, warrior[idxV[i]].authorName,
               scrV[idxV[i]]);
       aputs5(outs, NORMAL_ATTR);
       if (warriors > 2) {
         aputs5(resultsAre, NORMAL_ATTR);
         for (j = 0; j < warriors; ++j) {
-          sprintf(outs, " %d", warrior[idxV[i]].score[j]);
+          snprintf(outs, sizeof(outs), " %d", warrior[idxV[i]].score[j]);
           aputs5(outs, NORMAL_ATTR);
         }
-        sprintf(outs, " %d\n", deaths(idxV[i]));
+        snprintf(outs, sizeof(outs), " %d\n", deaths(idxV[i]));
         aputs5(outs, NORMAL_ATTR);
       }
     }
     if (warriors == 2) {
-      sprintf(outs, resultsWLT, warrior[idxV[0]].score[0],
+      snprintf(outs, sizeof(outs), resultsWLT, warrior[idxV[0]].score[0],
               warrior[idxV[0]].score[2], warrior[idxV[0]].score[1]);
       aputs5(outs, NORMAL_ATTR);
     }
@@ -2693,21 +2693,21 @@ results(outp)
     }
   } else {
     for (i = 0; i < warriors; ++i) {
-      sprintf(outs, nameByAuthorScores, warrior[idxV[i]].name, warrior[idxV[i]].authorName,
+      snprintf(outs, sizeof(outs), nameByAuthorScores, warrior[idxV[i]].name, warrior[idxV[i]].authorName,
               scrV[idxV[i]]);
       grputs(outs);
       if (warriors > 2) {
         grputs(resultsAre);
         for (j = 0; j < warriors; ++j) {
-          sprintf(outs, " %d", warrior[idxV[i]].score[j]);
+          snprintf(outs, sizeof(outs), " %d", warrior[idxV[i]].score[j]);
           grputs(outs);
         }
-        sprintf(outs, " %d\n", deaths(idxV[i]));
+        snprintf(outs, sizeof(outs), " %d\n", deaths(idxV[i]));
         grputs(outs);
       }
     }
     if (warriors == 2) {
-      sprintf(outs, resultsWLT, warrior[idxV[0]].score[0],
+      snprintf(outs, sizeof(outs), resultsWLT, warrior[idxV[0]].score[0],
               warrior[idxV[0]].score[2], warrior[idxV[0]].score[1]);
       grputs(outs);
     }
@@ -2739,22 +2739,22 @@ results(outp)
 
   if (!outp) {
     for (i = 0; i < warriors; ++i) {
-      sprintf(outs, nameByAuthorScores, warrior[idxV[i]].name, warrior[idxV[i]].authorName,
+      snprintf(outs, sizeof(outs), nameByAuthorScores, warrior[idxV[i]].name, warrior[idxV[i]].authorName,
               scrV[idxV[i]]);
       OUTTEXT(outs);
       if (warriors > 2) {
         OUTTEXT(resultsAre);
         for (j = 0; j < warriors; ++j) {
-          sprintf(outs, " %d", warrior[idxV[i]].score[j]);
+          snprintf(outs, sizeof(outs), " %d", warrior[idxV[i]].score[j]);
           OUTTEXT(outs);
         }
         OUTTEXT("\n");
-        sprintf(outs, " %d\n", deaths(idxV[i]));
+        snprintf(outs, sizeof(outs), " %d\n", deaths(idxV[i]));
         OUTTEXT(outs);
       }
     }
     if (warriors == 2) {
-      sprintf(outs, resultsWLT, warrior[idxV[0]].score[0],
+      snprintf(outs, sizeof(outs), resultsWLT, warrior[idxV[0]].score[0],
               warrior[idxV[0]].score[2], warrior[idxV[0]].score[1]);
       OUTTEXT(outs);
     }

@@ -389,7 +389,7 @@
 
 #if defined(GRAPHX)
 #ifdef SERVER
-#undef SERVER
+#error SERVER and GRAPHX are incompatible; server builds must disable the debugger
 #endif
 #endif
 
@@ -441,6 +441,9 @@
 #endif
 
 #if defined(STDGRAPHX)
+#ifdef SERVER
+#error SERVER and STDGRAPHX are incompatible; server builds must disable displays
+#endif
 #if defined(GRAPHX)
 #error some other graphx from STDGRAPHX already defined
 #else

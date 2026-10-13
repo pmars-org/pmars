@@ -46,6 +46,8 @@ rng(seed)
 {
   register S32_T temp = seed;
   if (!useExtRNG) {
+      temp = (S32_T)((U32_T)temp & INT_MAX);
+      if (!temp) temp = 1;
       temp = 16807 * (temp % 127773) - 2836 * (temp / 127773);
       if (temp < 0)
 	  temp += 2147483647;
@@ -140,10 +142,10 @@ init_rc5(U32_T *schedule)
 {
     U32_T a = 0, b = 0;
     int i, j;
-    unsigned char *p = SWITCH_F;
+    unsigned char *p = (unsigned char *)SWITCH_F;
     while (*p) {
-	for (i=0; *p && i<4; i++, p++)  a ^= *p << (i*8);
-	for (i=0; *p && i<4; i++, p++)  b ^= *p << (i*8);
+	for (i=0; *p && i<4; i++, p++)  a ^= (U32_T)*p << (i*8);
+	for (i=0; *p && i<4; i++, p++)  b ^= (U32_T)*p << (i*8);
     }
     rc5_schedule(schedule, a, b, 12);
 }

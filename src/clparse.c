@@ -40,6 +40,7 @@
 
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
 #include "global.h"
 
 #define CLP_MAXSTRLEN  8000
@@ -181,7 +182,7 @@ print_usage(clopt)
   int     i;
 
   if (!printed_usage) {
-    sprintf(outs, credits_screen1, PMARSVER / 100, (PMARSVER % 100) / 10,
+    snprintf(outs, sizeof(outs), credits_screen1, PMARSVER / 100, (PMARSVER % 100) / 10,
             PMARSVER % 10, PMARSDATE);
     errout(outs);
     errout(credits_screen2);
@@ -190,7 +191,7 @@ print_usage(clopt)
     errout(optionsAre);
     for (i = 0, clip = clopt; clip->storage != NULL; ++clip) {
       if (clip->description != NULL) {
-        sprintf(outs, "  -%c %s %-30s",
+        snprintf(outs, sizeof(outs), "  -%c %s %-30s",
                 clip->word, describe[(int) clip->dtype], clip->description);
         errout(outs);
         if (i++ % 2)
@@ -202,7 +203,7 @@ print_usage(clopt)
 #endif
 #if defined(XWINGRAPHX)
     for (i = 0; i < xMaxOptions; i++) {
-      sprintf(outs, "  -%-8s $ %-24s", xOptions[i], optXOpt[i]);
+      snprintf(outs, sizeof(outs), "  -%-8s $ %-24s", xOptions[i], optXOpt[i]);
       errout(outs);
       if (i % 2)
         errout("\n");
@@ -221,30 +222,43 @@ next_input(filep, inputs)
   FILE   *filep;
   char   *inputs;
 {
-  int     i;
+  int ch;
+  size_t used = 0;
   if (filep == NULL) {                /* read from command line */
     if (argc) {
+      if (strlen(*argv) >= CLP_MAXSTRLEN) {
+        errout("Command line argument too long\n");
+        Exit(CLP_NOGOOD);
+      }
       strcpy(inputs, *argv);
       --argc;
       ++argv;
     } else
       *inputs = '\0';                /* read from command file or stdin */
   } else {
-    *inputs = '\0';
-    /* if (!feof(filep))  */
-    fscanf(filep, "%s", inputs);
-    if (*inputs == '"') {        /* quoted string */
-      *inputs = ' ';
-      i = strlen(inputs);
-      if (inputs[i - 1] == '"')
-        inputs[i - 1] = '\0';
-      else
-        fscanf(filep, "%[^\"]%*[\"]", inputs + i);
+    int quoted;
+    do {
+      do { ch = fgetc(filep); } while (ch != EOF && isspace((unsigned char)ch));
+      if (ch == ';') {
+        while ((ch = fgetc(filep)) != EOF && ch != '\n');
+        if (ch == EOF) break;
+        ch = ';';
+      }
+    } while (ch == ';');
+    quoted = ch == '"';
+    if (quoted) ch = fgetc(filep);
+    while (ch != EOF && (quoted ? ch != '"' : !isspace((unsigned char)ch))) {
+      if (ch == 0 || used >= CLP_MAXSTRLEN - 1) {
+        errout("Invalid or oversized option file argument\n");
+        Exit(CLP_NOGOOD);
+      }
+      inputs[used++] = (char)ch;
+      ch = fgetc(filep);
     }
-    while (*inputs == ';') {
-      fgets(inputs, 100, filep);
-      *inputs = '\0';
-      fscanf(filep, "%s", inputs);
+    inputs[used] = '\0';
+    if ((quoted && ch != '"') || ferror(filep)) {
+      errout("Cannot read option file argument\n");
+      Exit(CLP_NOGOOD);
     }
   }
   if (!strcmp(inputs, "$"))        /* end of input marker */
@@ -270,6 +284,13 @@ clp_parse(clopt, filep)
   unsigned bool_switch;
   char    inputs[CLP_MAXSTRLEN];
   FILE   *newFile;
+  static unsigned int include_depth;
+
+  if (include_depth >= 16) {
+    errout("Option file nesting limit exceeded\n");
+    return CLP_NOGOOD;
+  }
+  ++include_depth;
 
   code = NONE;                        /* no error so far */
   while (next_input(filep, inputs)) {
@@ -309,11 +330,15 @@ clp_parse(clopt, filep)
                 goto ERROR;
               }
             }
-            if ((clp_parse(clopt, newFile)) != NONE) {
+            {
+              int nested_result = clp_parse(clopt, newFile);
+              if (newFile != stdin) fclose(newFile);
+              if (nested_result != NONE) {
               code = OLDERROR;
               if (newFile == stdin)
                 strcpy(inputs, standardInput);
               goto ERROR;        /* error in command file */
+              }
             }
           } else                /* no such option   */
 #endif                                /* MACGRAPHX */
@@ -348,8 +373,13 @@ clp_parse(clopt, filep)
                 }
               } else {
                 char   *idx;
-                clip->def = atol(inputs);
-                for (idx = inputs; *idx && isdigit(*idx); ++idx);
+                errno = 0;
+                clip->def = strtol(inputs, &idx, 10);
+                if (errno == ERANGE || idx == inputs) {
+                  code = RANGE;
+                  goto ERROR;
+                }
+                for (idx = inputs; *idx && isdigit((unsigned char)*idx); ++idx);
                 if (*idx) {
                   code = ARGUMENT;
                   goto ERROR;
@@ -376,7 +406,18 @@ clp_parse(clopt, filep)
             many++;
           } else {                /* number before - ? */
             inputs[many] = 0;        /* kill the - sign */
-            many = atoi(inputs);/* how many warriors from stdin */
+            {
+              char *end;
+              long count;
+              errno = 0;
+              count = strtol(inputs, &end, 10);
+              if (errno == ERANGE || *end || end == inputs || count < 1 ||
+                  count > MAXWARRIOR - warriors) {
+                code = TOO_MANY;
+                goto ERROR;
+              }
+              many = (int)count;
+            }
             if (!many) {
               code = OPTION;
               goto ERROR;
@@ -387,6 +428,10 @@ clp_parse(clopt, filep)
 #endif
           many = 1;
         for (; many; many--) {
+          if (warriors >= MAXWARRIOR) {
+            code = TOO_MANY;
+            goto ERROR;
+          }
           if ((warrior[warriors].fileName =
             (char *) malloc((strlen(inputs) + 1) * sizeof(char))) != NULL) {
             strcpy(warrior[warriors++].fileName, inputs);
@@ -401,6 +446,7 @@ clp_parse(clopt, filep)
       }
     }
   }
+  --include_depth;
   return (0);
 
 ERROR:
@@ -411,41 +457,42 @@ ERROR:
   case NONE:
     break;
   case OLDERROR:
-    sprintf(outs, errorIsLocatedIn, inputs);
+    snprintf(outs, sizeof(outs), errorIsLocatedIn, inputs);
     errout(outs);
     break;
   case OPTION:
-    sprintf(outs, unknownOption, inputs);
+    snprintf(outs, sizeof(outs), unknownOption, inputs);
     errout(outs);
     break;
   case ARGUMENT:
 #if defined(XWINGRAPHX)
     if (clip->word == 'x')
-      sprintf(outs, badArgumentForXSwitch, xOptions[clip->def]);
+      snprintf(outs, sizeof(outs), badArgumentForXSwitch, xOptions[clip->def]);
     else
 #endif
-      sprintf(outs, badArgumentForSwitch, clip->word);
+      snprintf(outs, sizeof(outs), badArgumentForSwitch, clip->word);
     errout(outs);
     break;
   case RANGE:
-    sprintf(outs, optionMustBeInTheRange, clip->word);
+    snprintf(outs, sizeof(outs), optionMustBeInTheRange, clip->word);
     errout(outs);
-    sprintf(outs, "%ld - %ld\n", (clip->min), (clip->max));
+    snprintf(outs, sizeof(outs), "%ld - %ld\n", (clip->min), (clip->max));
     errout(outs);
     break;
   case TOO_MANY:
-    sprintf(outs, tooManyParameters, inputs);
+    snprintf(outs, sizeof(outs), tooManyParameters, inputs);
     errout(outs);
     break;
   case MEMORY:
-    sprintf(outs, "%s", outOfMemory);
+    snprintf(outs, sizeof(outs), "%s", outOfMemory);
     errout(outs);
     break;
   case FILENAME:
-    sprintf(outs, "%s", cannotOpenParameterFile);
+    snprintf(outs, sizeof(outs), "%s", cannotOpenParameterFile);
     errout(outs);
     break;
   }
+  --include_depth;
   return (CLP_NOGOOD);
 }
 
@@ -595,17 +642,21 @@ parse_param(largc, largv)
 	char   *idx;
 	useExtRNG = 0;
 	SWITCH_Fnum = 0;
-	for (idx = SWITCH_F; *idx; ++idx) {
-	  useExtRNG |= !isdigit(*idx);
-	  SWITCH_Fnum *= 10;
-	  SWITCH_Fnum += (unsigned char)(*idx) - '0';
-	}
+	for (idx = SWITCH_F; *idx; ++idx)
+	  useExtRNG |= !isdigit((unsigned char)*idx);
+        if (!useExtRNG) {
+          long fixed;
+          errno = 0;
+          fixed = strtol(SWITCH_F, &idx, 10);
+          if (errno == ERANGE || *idx || fixed > MAXCORESIZE) {
+            errout("Fixed position exceeds supported range\n");
+            result = CLP_NOGOOD;
+          } else SWITCH_Fnum = (S32_T)fixed;
+        }
 	if (!useExtRNG && separation > SWITCH_Fnum) {
 	  print_usage(options);
 	  errout(FLessThand);
 	  result = CLP_NOGOOD;
-	} else {
-	    if (SWITCH_Fnum < 0) SWITCH_Fnum *= -1;
 	}
       }
       set_reg('W', (long) warriors);
@@ -654,6 +705,15 @@ parse_param(largc, largv)
       }
 #endif
       /* further checks of the values */
+      if (warriors > 0 &&
+          ((unsigned long)taskNum > (UINT_MAX - 1UL) / (unsigned int)warriors ||
+           (size_t)taskNum > (((size_t)-1) / sizeof(ADDR_T) - 1) / (unsigned int)warriors ||
+           cycles > LONG_MAX / warriors ||
+           (unsigned long)cycles > UINT_MAX / (unsigned int)warriors ||
+           (size_t)coreSize > ((size_t)-1) / sizeof(mem_struct))) {
+        errout("Simulation parameters exceed safe allocation or counter limits\n");
+        result = CLP_NOGOOD;
+      }
 
 #ifndef OS2PMGRAPHX                /* jk - we can load files after the fact... */
       if (warrior[0].fileName == NULL) {

@@ -362,11 +362,12 @@ extern ADDR_T *pSpace[MAXWARRIOR];
 #endif
 extern ADDR_T pSpaceSize;
 
+#define         SPEEDLEVELS 9
+
 /* ***********************************************************************
    display define's, declarations and typedefs
    *********************************************************************** */
 
-#define         SPEEDLEVELS 9
 
 #if defined(DOSTXTGRAPHX) || defined(DOSGRXGRAPHX) || defined(LINUXGRAPHX) \
     || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
