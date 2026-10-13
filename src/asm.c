@@ -183,8 +183,25 @@ char   *swname[] = {"ASSERT", ""};
 #define GRPMAX   7                /* max group */
 #define LEXCMAX  50                /* max number of excess lines */
 
+/* Per-assembly limits include input, macro work and host call depth. */
+#define ASM_MAX_WORK 1000000UL
+#define ASM_MAX_INPUT (1024UL * 1024UL)
+#define ASM_MAX_DEPTH 128
+static unsigned long asm_work;
+static unsigned int asm_depth;
+static int assembling;
+static int asm_budget(void)
+{
+  if (++asm_work > ASM_MAX_WORK || asm_depth >= ASM_MAX_DEPTH) {
+    fprintf(stderr, "Assembly complexity limit exceeded\n");
+    Exit(PARSEERR);
+    return FALSE;
+  }
+  return TRUE;
+}
+
 static char noassert;
-static uChar errnum, warnum;        /* Number of error and warning */
+static unsigned int errnum, warnum; /* counters must not wrap on repeated macro errors */
 static uChar symnum;
 
 static ref_st *reftbl;
@@ -222,6 +239,7 @@ static void textout(), errprn();
 static void lineswitch(char *, char *, uShrt, line_st *);
 static int globalswitch(char *, uShrt, uShrt, uShrt);
 static int trav2(char *, char *, int);
+static int trav2_impl(char *, char *, int);
 static int normalize(long);
 static int blkfor(char *, char *);
 static int equtbl(char *, char *);
@@ -239,11 +257,12 @@ static void disposetbl(ref_st *, ref_st *);
 static void cleanmem(void);
 static void nocmnt(char *);
 static void automaton(char *, stateCol, mem_struct *);
+static void automaton_impl(char *, stateCol, mem_struct *);
 static void dfashell(char *, mem_struct *);
 static void expand(uShrt), encode(uShrt);
 #else
 static void lineswitch();
-static int globalswitch(), trav2(), normalize();
+static int globalswitch(), trav2(), trav2_impl(), normalize();
 static int blkfor(), equtbl(), equsub();
 static ref_st *lookup();
 static grp_st *addsym();
@@ -253,7 +272,7 @@ static void addpredefs();
 static void show_info(), show_lbl();
 static void disposeline(), disposegrp(), disposetbl();
 static void cleanmem(), nocmnt();
-static void automaton(), dfashell(), expand(), encode();
+static void automaton(), automaton_impl(), dfashell(), expand(), encode();
 #endif
 
 /* ************************* Parse state **************************** */
@@ -294,6 +313,7 @@ newtbl()
   if ((curtbl = (ref_st *) MALLOC(sizeof(ref_st))) != NULL) {
     curtbl->grpsym = NULL;
     curtbl->sline = NULL;
+    curtbl->reftype = RLABEL;
     curtbl->visit = FALSE;        /* needed to detect recursive reference */
     curtbl->nextref = reftbl;
     reftbl = curtbl;
@@ -318,6 +338,7 @@ addsym(symn, curgroup)
       MEMORYERROR;
     }
 
+  if (!symgrp) MEMORYERROR;
   return symgrp;
 }
 
@@ -332,7 +353,7 @@ addpredef(symn, value)
   line_st *aline;
 
   lsymtbl = addsym(symn, lsymtbl);
-  sprintf(token, "%lu", (unsigned long) value);
+  snprintf(token, sizeof(token), "%lu", (unsigned long) value);
   newtbl();
   reftbl->grpsym = lsymtbl;
   reftbl->reftype = RTEXT;
@@ -391,6 +412,8 @@ addline(vline, src, lspnt)
       FREE(temp);
       MEMORYERROR;
     }
+  else
+    MEMORYERROR;
 }
 
 /* ******************************************************************* */
@@ -406,6 +429,7 @@ addlinesrc(src, loc)
     MEMORYERROR;
   else {
     alinesrc->src = pstrdup(src);
+    if (!alinesrc->src) MEMORYERROR;
     alinesrc->loc = loc;
     alinesrc->nextsrc = srctbl;
     srctbl = alinesrc;
@@ -453,6 +477,7 @@ disposetbl(atbl, btbl)
   ref_st *tmp;
 
   while ((tmp = atbl) != btbl) {
+    if (tmp->reftype == RTEXT) disposeline(tmp->sline);
     disposegrp(tmp->grpsym);
     atbl = atbl->nextref;
     FREE(tmp);
@@ -513,12 +538,12 @@ show_lbl()
       break;
     case RSTACK:
       textout(stackMsg);
-      sprintf(outs, "%5d\n\n", aref->value);
+      snprintf(outs, sizeof(outs), "%5d\n\n", aref->value);
       textout(outs);
       break;
     case RLABEL:
       textout(labelMsg);
-      sprintf(outs, "%5d\n\n", aref->value);
+      snprintf(outs, sizeof(outs), "%5d\n\n", aref->value);
       textout(outs);
       break;
     }
@@ -536,13 +561,13 @@ show_info(sspnt)
 {
   line_st *aline;
 
-  sprintf(outs, afterPass, pass);
+  snprintf(outs, sizeof(outs), afterPass, pass);
   textout(outs);
 
   textout(instrMsg);
 
   for (aline = sline[sspnt]; aline; aline = aline->nextline) {
-    sprintf(outs, "(%5d) %s\n", aline->linesrc->loc, aline->vline);
+    snprintf(outs, sizeof(outs), "(%5d) %s\n", aline->linesrc->loc, aline->vline);
     textout(outs);
   }
   textout(endOfPass);
@@ -567,8 +592,8 @@ globalswitch(str, idx, loc, lspnt)
   char   *str;
   uShrt   idx, loc, lspnt;
 {
-  uChar   i;
-  i = (uChar) idx;
+  unsigned int i;
+  i = idx;
 
   get_token(str, &i, token);
   to_upper(token);
@@ -576,7 +601,7 @@ globalswitch(str, idx, loc, lspnt)
   if (!strcmp(token, "REDCODE") && i == idx + 7)        /* no leading spaces */
     return -1;
 
-  while (isspace(str[i]))
+  while (isspace((unsigned char)(str[i])))
     i++;
 
   if (strcmp(token, "NAME") == 0) {
@@ -620,8 +645,8 @@ lineswitch(str, dest, idx, aline)        /* line switch */
   line_st *aline;
 {
   int     evalerr;
-  uChar   i;
-  i = (uChar) idx;
+  unsigned int i;
+  i = idx;
   get_token(str, &i, token);
   to_upper(token);
 
@@ -632,7 +657,7 @@ lineswitch(str, dest, idx, aline)        /* line switch */
     trav2((char *) str + i, dest, SVAL);
 
     if (SWITCH_V) {
-      sprintf(outs, currentAssertMsg, dest);
+      snprintf(outs, sizeof(outs), currentAssertMsg, dest);
       textout(outs);
     }
     if ((evalerr = eval_expr(dest, &result)) < OK_EXPR)
@@ -753,10 +778,10 @@ errprn(code, aline, arg)
     strcpy(abuf, bufferOverflowErr);
     break;
   case ERVERR:
-    sprintf(abuf, illegalConcatErr, arg);
+    snprintf(abuf, sizeof(abuf), illegalConcatErr, arg);
     break;
   case GRPERR:
-    sprintf(abuf, tooManyLabelsErr, arg);
+    snprintf(abuf, sizeof(abuf), tooManyLabelsErr, arg);
     break;
   case FORERR:
     strcpy(abuf, unopenedFORErr);
@@ -766,21 +791,21 @@ errprn(code, aline, arg)
     errorlevel = WARNING;
     break;
   case M88ERR:
-    sprintf(abuf, bad88FormatErr, arg);
+    snprintf(abuf, sizeof(abuf), bad88FormatErr, arg);
     break;
   case ZLNERR:
     strcpy(abuf, noInstErr);
     errorlevel = WARNING;
     break;
   case DLBERR:
-    sprintf(abuf, discardLabelErr, arg);
+    snprintf(abuf, sizeof(abuf), discardLabelErr, arg);
     errorlevel = WARNING;
     break;
   case TOKERR:
-    sprintf(abuf, tokenErr, arg);
+    snprintf(abuf, sizeof(abuf), tokenErr, arg);
     break;
   case SNFERR:
-    sprintf(abuf, undefinedSymErr, arg);
+    snprintf(abuf, sizeof(abuf), undefinedSymErr, arg);
     break;
   case NUMERR:
     strcpy(abuf, expectNumberErr);
@@ -789,13 +814,13 @@ errprn(code, aline, arg)
     strcpy(abuf, syntaxErr);
     break;
   case LINERR:
-    sprintf(abuf, tooManyInstrErr, arg);
+    snprintf(abuf, sizeof(abuf), tooManyInstrErr, arg);
     break;
   case EXPERR:
-    sprintf(abuf, missingErr, arg);
+    snprintf(abuf, sizeof(abuf), missingErr, arg);
     break;
   case RECERR:
-    sprintf(abuf, recursiveErr, arg);
+    snprintf(abuf, sizeof(abuf), recursiveErr, arg);
     break;
   case EVLERR:
     strcpy(abuf, badExprErr);
@@ -816,7 +841,7 @@ errprn(code, aline, arg)
     errorlevel = WARNING;
     break;
   case CATERR:
-    sprintf(abuf, concatErr, arg);
+    snprintf(abuf, sizeof(abuf), concatErr, arg);
     break;
   case DOEERR:
     strcpy(abuf, ignoreENDErr);
@@ -827,40 +852,40 @@ errprn(code, aline, arg)
     errorlevel = WARNING;
     break;
   case EXXERR:
-    sprintf(abuf, tooMuchStuffErr, MAXINSTR);
+    snprintf(abuf, sizeof(abuf), tooMuchStuffErr, MAXINSTR);
     break;
   case IGNORE:
-    sprintf(abuf, extraTokenErr, arg);
+    snprintf(abuf, sizeof(abuf), extraTokenErr, arg);
     errorlevel = WARNING;
     break;
   case APPERR:
-    sprintf(abuf, improperPlaceErr, arg);
+    snprintf(abuf, sizeof(abuf), improperPlaceErr, arg);
     break;
   case F88ERR:
-    sprintf(abuf, invalid88Err, arg);
+    snprintf(abuf, sizeof(abuf), invalid88Err, arg);
     break;
   case NOPERR:
-    sprintf(abuf, incompleteOpErr, arg);
+    snprintf(abuf, sizeof(abuf), incompleteOpErr, arg);
     break;
   case IDNERR:
-    sprintf(abuf, redefinitionErr, arg);
+    snprintf(abuf, sizeof(abuf), redefinitionErr, arg);
     errorlevel = WARNING;
     break;
   case UDFERR:
-    sprintf(abuf, undefinedLabelErr, arg);
+    snprintf(abuf, sizeof(abuf), undefinedLabelErr, arg);
     errorlevel = WARNING;
     break;
   case CHKERR:
     strcpy(abuf, assertionFailErr);
     break;
   case MISC:
-    strcpy(abuf, arg);
+    snprintf(abuf, sizeof(abuf), "%s", arg);
     break;
   case FNFERR:
-    sprintf(abuf, fileOpenErr, arg);
+    snprintf(abuf, sizeof(abuf), fileOpenErr, arg);
     break;
   case DSKERR:
-    sprintf(abuf, fileReadErr, arg);
+    snprintf(abuf, sizeof(abuf), fileReadErr, arg);
     break;
   case MLCERR:
     cleanmem();                        /* refresh memory for fprintf and system */
@@ -890,7 +915,7 @@ errprn(code, aline, arg)
       i++;
 
     if (i == ierr) {
-      sprintf(outs, "%s", errorlevel == WARNING ? warning : error);
+      snprintf(outs, sizeof(outs), "%s", errorlevel == WARNING ? warning : error);
 #ifndef VMS
       textout(outs);
 #else                                /* if defined(VMS) */
@@ -905,9 +930,9 @@ errprn(code, aline, arg)
 
       if (!SWITCH_D) {
 #endif
-        sprintf(outs, inLine, aline->linesrc->loc, aline->linesrc->src);
+        snprintf(outs, sizeof(outs), inLine, aline->linesrc->loc, aline->linesrc->src);
         textout(outs);
-        sprintf(outs, "        %s\n", abuf);
+        snprintf(outs, sizeof(outs), "        %s\n", abuf);
         textout(outs);
 #ifdef VMS
       } else {
@@ -921,7 +946,7 @@ errprn(code, aline, arg)
     } else
       errkeep[i].num++;
   } else {
-    sprintf(outs, "%s:\n",
+    snprintf(outs, sizeof(outs), "%s:\n",
             errorlevel == WARNING ? warning : error);
 
 #ifndef VMS
@@ -936,7 +961,7 @@ errprn(code, aline, arg)
               errorlevel == WARNING ? LSEWarn : LSEErr);
     }
 #endif
-    sprintf(outs, "        %s\n", abuf);
+    snprintf(outs, sizeof(outs), "        %s\n", abuf);
 #ifndef VMS
     textout(outs);
 #else
@@ -950,7 +975,7 @@ errprn(code, aline, arg)
   }
 
   if (ierr >= ERRMAX) {
-    sprintf(outs, "%s", tooManyMsgErr);
+    snprintf(outs, sizeof(outs), "%s", tooManyMsgErr);
 #ifndef VMS
     textout(outs);
 #else
@@ -966,7 +991,7 @@ errprn(code, aline, arg)
     Exit(PARSEERR);
 
   }
-  strcpy(errmsg, abuf);
+  snprintf(errmsg, MAXALLCHAR, "%s", abuf);
 }
 
 /* ******************************************************************* */
@@ -975,10 +1000,10 @@ errprn(code, aline, arg)
 #define B_expr buf2
 #define vallen 8
 static uChar opcode, modifier;
-static uChar statefine;
+static unsigned int statefine;
 static stateCol laststate;
 
-static uShrt line, linemax;
+static uShrt line;
 static uChar vcont;
 static uShrt dspnt;
 static line_st *aline;
@@ -987,15 +1012,27 @@ static line_st *aline;
 
 /* Here is the automaton */
 static void
-automaton(expr, state, cell)
+automaton(char *expr, stateCol state, mem_struct *cell)
+{
+  if (!asm_budget()) return;
+  ++asm_depth;
+  automaton_impl(expr, state, cell);
+  --asm_depth;
+}
+
+static void
+automaton_impl(expr, state, cell)
   char   *expr;
   stateCol state;
   mem_struct *cell;
 {
-  uChar   idx = 0;
+  unsigned int idx = 0;
   char   *tmp;
   ref_st *atbl;
 
+  /* Flat token transitions consume work, but not nesting depth. */
+next_state:
+  idx = 0;
   switch (laststate = state) {
 
   case S_OP:
@@ -1003,9 +1040,9 @@ automaton(expr, state, cell)
     if (get_token(expr, &idx, token) == CHARTOKEN) {
       to_upper(token);
       if ((opcode = str_in_set(token, opname)) < OPNUM)
-        automaton((char *) expr + idx, S_MOD_ADDR_EXP, cell);
+        { expr += idx; state = S_MOD_ADDR_EXP; goto advance_state; }
       else if (opcode < EQUOP)
-        automaton((char *) expr + idx, S_EXPR, cell);
+        { expr += idx; state = S_EXPR; goto advance_state; }
       else
 /* This should be toggled as error. No label should appear at this point */
         LOGICERROR;
@@ -1017,7 +1054,7 @@ automaton(expr, state, cell)
     statefine = FALSE;
     switch (get_token(expr, &idx, token)) {
     case MODFTOKEN:
-      automaton((char *) expr + idx, S_MODF, cell);
+      { expr += idx; state = S_MODF; goto advance_state; }
       break;
     case ADDRTOKEN:
       cell->A_mode = (FIELD_T) ch_in_set(*token, addr_sym);
@@ -1029,11 +1066,11 @@ automaton(expr, state, cell)
           cell->A_mode = SYM_TO_INDIR_A(cell->A_mode);
       }
 #endif
-      automaton((char *) expr + idx, S_EXP_FS, cell);
+      { expr += idx; state = S_EXP_FS; goto advance_state; }
       break;
     case NUMBTOKEN:
     case EXPRTOKEN:
-      automaton(expr, S_EXP_FS, cell);
+      { state = S_EXP_FS; goto advance_state; }
       break;
     case CHARTOKEN:
       if ((atbl = lookup(token)) != NULL)
@@ -1044,7 +1081,7 @@ automaton(expr, state, cell)
             atbl->visit = TRUE;
             automaton(atbl->sline->vline, S_MOD_ADDR_EXP, cell);
             atbl->visit = FALSE;
-            automaton((char *) expr + idx, laststate, cell);
+            { expr += idx; state = laststate; goto advance_state; }
           } else
 /* all slines should've been filled */
             LOGICERROR;
@@ -1054,11 +1091,11 @@ automaton(expr, state, cell)
           automaton(tmp, S_MOD_ADDR_EXP, cell);
           FREE(tmp);
           atbl->visit = FALSE;
-          automaton((char *) expr + idx, laststate, cell);
+          { expr += idx; state = laststate; goto advance_state; }
         } else
           MEMORYERROR;
       else if (!token[1])
-        automaton(expr, S_EXP_FS, cell);
+        { state = S_EXP_FS; goto advance_state; }
       else
         errprn(SNFERR, aline, token);
       break;
@@ -1075,7 +1112,7 @@ automaton(expr, state, cell)
     case CHARTOKEN:
       to_upper(token);
       if ((modifier = str_in_set(token, modname)) < MODNUM)
-        automaton((char *) expr + idx, S_ADDR_EXP_A, cell);
+        { expr += idx; state = S_ADDR_EXP_A; goto advance_state; }
       else
         errprn(EXPERR, aline, modifierMsg);
       break;
@@ -1099,11 +1136,11 @@ automaton(expr, state, cell)
           cell->A_mode = SYM_TO_INDIR_A(cell->A_mode);
       }
 #endif
-      automaton((char *) expr + idx, S_EXP_FS, cell);
+      { expr += idx; state = S_EXP_FS; goto advance_state; }
       break;
     case NUMBTOKEN:
     case EXPRTOKEN:
-      automaton(expr, S_EXP_FS, cell);
+      { state = S_EXP_FS; goto advance_state; }
       break;
     case CHARTOKEN:
       if ((atbl = lookup(token)) != NULL)
@@ -1114,7 +1151,7 @@ automaton(expr, state, cell)
             atbl->visit = TRUE;
             automaton(atbl->sline->vline, S_ADDR_EXP_A, cell);
             atbl->visit = FALSE;
-            automaton((char *) expr + idx, laststate, cell);
+            { expr += idx; state = laststate; goto advance_state; }
           } else
 /* all slines should've been filled */
             LOGICERROR;
@@ -1124,11 +1161,11 @@ automaton(expr, state, cell)
           automaton(tmp, S_ADDR_EXP_A, cell);
           FREE(tmp);
           atbl->visit = FALSE;
-          automaton((char *) expr + idx, laststate, cell);
+          { expr += idx; state = laststate; goto advance_state; }
         } else
           MEMORYERROR;
       else if (!token[1])
-        automaton(expr, S_EXP_FS, cell);
+        { state = S_EXP_FS; goto advance_state; }
       else
         errprn(SNFERR, aline, token);
       break;
@@ -1142,7 +1179,7 @@ automaton(expr, state, cell)
   case S_EXP_FS:
     switch (get_token(expr, &idx, token)) {
     case FSEPTOKEN:
-      automaton((char *) expr + idx, S_ADDR_EXP_B, cell);
+      { expr += idx; state = S_ADDR_EXP_B; goto advance_state; }
       break;
     case ADDRTOKEN:
       if ((token[0] != '>') && (token[0] != '<') && (token[0] != '*'))
@@ -1151,7 +1188,7 @@ automaton(expr, state, cell)
         if (!concat(A_expr, token))
           errprn(BUFERR, aline, "");
         statefine = TRUE;
-        automaton((char *) expr + idx, S_EXP_FS, cell);
+        { expr += idx; state = S_EXP_FS; goto advance_state; }
       }
       break;
     case NUMBTOKEN:
@@ -1162,7 +1199,7 @@ automaton(expr, state, cell)
       if (!concat(A_expr, token))
         errprn(BUFERR, aline, "");
       statefine = TRUE;
-      automaton((char *) expr + idx, S_EXP_FS, cell);
+      { expr += idx; state = S_EXP_FS; goto advance_state; }
       break;
     case CHARTOKEN:
       if ((atbl = lookup(token)) != NULL)
@@ -1173,7 +1210,7 @@ automaton(expr, state, cell)
             atbl->visit = TRUE;
             automaton(atbl->sline->vline, S_EXP_FS, cell);
             atbl->visit = FALSE;
-            automaton((char *) expr + idx, laststate, cell);
+            { expr += idx; state = laststate; goto advance_state; }
           } else
 /* all slines should've been filled */
             LOGICERROR;
@@ -1183,13 +1220,13 @@ automaton(expr, state, cell)
           automaton(tmp, S_EXP_FS, cell);
           FREE(tmp);
           atbl->visit = FALSE;
-          automaton((char *) expr + idx, laststate, cell);
+          { expr += idx; state = laststate; goto advance_state; }
         } else
           MEMORYERROR;
       else if (!token[1])        /* check if it's a register. */
         if (concat(A_expr, token)) {
           statefine = TRUE;
-          automaton((char *) expr + idx, S_EXP_FS, cell);
+          { expr += idx; state = S_EXP_FS; goto advance_state; }
         } else
           errprn(BUFERR, aline, "");
       else
@@ -1215,11 +1252,11 @@ automaton(expr, state, cell)
           cell->B_mode = SYM_TO_INDIR_A(cell->B_mode);
       }
 #endif
-      automaton((char *) expr + idx, S_EXPR, cell);
+      { expr += idx; state = S_EXPR; goto advance_state; }
       break;
     case NUMBTOKEN:
     case EXPRTOKEN:
-      automaton(expr, S_EXPR, cell);
+      { state = S_EXPR; goto advance_state; }
       break;
     case CHARTOKEN:
       if ((atbl = lookup(token)) != NULL)
@@ -1230,7 +1267,7 @@ automaton(expr, state, cell)
             atbl->visit = TRUE;
             automaton(atbl->sline->vline, S_ADDR_EXP_B, cell);
             atbl->visit = FALSE;
-            automaton((char *) expr + idx, laststate, cell);
+            { expr += idx; state = laststate; goto advance_state; }
           } else
 /* all slines should've been filled */
             LOGICERROR;
@@ -1240,11 +1277,11 @@ automaton(expr, state, cell)
           automaton(tmp, S_ADDR_EXP_B, cell);
           FREE(tmp);
           atbl->visit = FALSE;
-          automaton((char *) expr + idx, laststate, cell);
+          { expr += idx; state = laststate; goto advance_state; }
         } else
           MEMORYERROR;
       else if (!token[1])
-        automaton(expr, S_EXPR, cell);
+        { state = S_EXPR; goto advance_state; }
       else
         errprn(SNFERR, aline, token);
       break;
@@ -1264,7 +1301,7 @@ automaton(expr, state, cell)
         if (!concat(B_expr, token))
           errprn(BUFERR, aline, "");
         statefine = TRUE;
-        automaton((char *) expr + idx, S_EXPR, cell);
+        { expr += idx; state = S_EXPR; goto advance_state; }
       }
       break;
     case NUMBTOKEN:
@@ -1275,7 +1312,7 @@ automaton(expr, state, cell)
       if (!concat(B_expr, token))
         errprn(BUFERR, aline, "");
       statefine = TRUE;
-      automaton((char *) expr + idx, S_EXPR, cell);
+      { expr += idx; state = S_EXPR; goto advance_state; }
       break;
     case CHARTOKEN:
       if ((atbl = lookup(token)) != NULL)
@@ -1286,7 +1323,7 @@ automaton(expr, state, cell)
             atbl->visit = TRUE;
             automaton(atbl->sline->vline, S_EXPR, cell);
             atbl->visit = FALSE;
-            automaton((char *) expr + idx, S_EXPR, cell);
+            { expr += idx; state = S_EXPR; goto advance_state; }
           } else
 /* all slines should've been filled */
             LOGICERROR;
@@ -1299,13 +1336,13 @@ automaton(expr, state, cell)
           automaton(tmp, S_EXPR, cell);
           FREE(tmp);
           atbl->visit = FALSE;
-          automaton((char *) expr + idx, S_EXPR, cell);
+          { expr += idx; state = S_EXPR; goto advance_state; }
         } else
           MEMORYERROR;
       else if (!token[1])        /* check for register use */
         if (concat(B_expr, token)) {
           statefine = TRUE;
-          automaton((char *) expr + idx, S_EXPR, cell);
+          { expr += idx; state = S_EXPR; goto advance_state; }
         } else
           errprn(BUFERR, aline, "");
       else
@@ -1318,6 +1355,12 @@ automaton(expr, state, cell)
     }
     break;
   }
+  return;
+
+advance_state:
+  if (!asm_budget())
+    return;
+  goto next_state;
 }
 
 /* ******************************************************************* */
@@ -1375,7 +1418,7 @@ dfashell(expr, cell)
       case SUB:
       case CMP:
         if (cell->B_mode == (FIELD_T) IMMEDIATE) {
-          sprintf(token, "%s [#$@<] [$@<]", opname[opcode]);
+          snprintf(token, sizeof(token), "%s [#$@<] [$@<]", opname[opcode]);
           errprn(F88ERR, aline, token);
         }
         break;
@@ -1385,7 +1428,7 @@ dfashell(expr, cell)
       case DJN:
       case SPL:
         if (cell->A_mode == (FIELD_T) IMMEDIATE) {
-          sprintf(token, "%s [$@<] [#$@<]", opname[opcode]);
+          snprintf(token, sizeof(token), "%s [$@<] [#$@<]", opname[opcode]);
           errprn(F88ERR, aline, token);
         }
         break;
@@ -1467,9 +1510,8 @@ static int
 normalize(value)
   long    value;
 {
-  while (value >= (long) coreSize)
-    value -= (long) coreSize;
-  while (value < 0)
+  value %= (long) coreSize;
+  if (value < 0)
     value += (long) coreSize;
   return ((int) value);
 }
@@ -1488,7 +1530,7 @@ encode(sspnt)
   if (line <= MAXINSTR) {
 
     if (line > (uShrt) instrLim) {
-      sprintf(buf, "%d", (int) line - instrLim);
+      snprintf(buf, sizeof(buf), "%d", (int) line - instrLim);
       errprn(LINERR, (line_st *) NULL, buf);
     }
     warrior[curWarrior].instLen = line;
@@ -1580,15 +1622,17 @@ blkfor(expr, dest)
   long    result;
   ref_st *atbl, *ptbl;
   grp_st *forSymGr;
+  unsigned long iteration;
 
   if (symtbl) {
-    forSymGr = addsym(symtbl->symn, NULL);
+    forSymGr = symtbl;
     if (symtbl->nextsym) {
       newtbl();
       reftbl->reftype = RLABEL;
       reftbl->grpsym = symtbl->nextsym;
       reftbl->value = line;
     }
+    forSymGr->nextsym = NULL;
     symtbl = NULL;
     symnum = 0;
   } else
@@ -1598,15 +1642,17 @@ blkfor(expr, dest)
   trav2(expr, dest, SVAL);
 
   if (SWITCH_V) {
-    sprintf(outs, currentFORMsg, dest);
+    snprintf(outs, sizeof(outs), currentFORMsg, dest);
     textout(outs);
   }
   if ((evalerr = eval_expr(dest, &result)) < OK_EXPR) {
+    disposegrp(forSymGr);
     if (evalerr == DIV_ZERO)
       errprn(DIVERR, aline, "");
     else
       errprn(EVLERR, aline, "");
-  } else if (result <= 0L || (uShrt) result == 0) {
+  } else if (result <= 0L) {
+    disposegrp(forSymGr);
     if (evalerr == OVERFLOW)
       errprn(OFLERR, aline, "");
     statefine++;
@@ -1621,9 +1667,14 @@ blkfor(expr, dest)
     atbl = reftbl;
 
     cline = aline;
-    for (atbl->value = 1; vcont && atbl->value <= (uShrt) result && aline;
-         atbl->value++)
-      for (aline = cline; vcont;)
+    if (result > USHRT_MAX) {
+      errprn(MISC, aline, "FOR count exceeds limit");
+      vcont = FALSE;
+      return SERR;
+    }
+    for (iteration = 1; vcont && iteration <= (unsigned long) result && aline;
+         iteration++)
+      for (aline = cline, atbl->value = (uShrt) iteration; vcont;)
         if (aline->nextline) {
           int     r;
 
@@ -1664,7 +1715,7 @@ equtbl(expr, dest)
   char   *dest;
 {
   line_st *cline, *pline = NULL;
-  uChar   i;
+  unsigned int i;
 
   if (symtbl) {
 
@@ -1737,26 +1788,40 @@ equsub(expr, dest, wdecl, tbl)
   }
 
   aline = cline;
-  if (isspace(*expr))
+  if (isspace((unsigned char)(*expr)))
     concat(dest, " ");
 
   tbl->visit = 0;
-  return trav2(expr, dest, wdecl);
+  /* The caller resumes the remaining tokens without retaining this frame. */
+  return wdecl;
 }
 
 /* ******************************************************************* */
 
-/* recursively traverse the buffer */
+/* Traverse ordinary tokens iteratively; recurse only for nested constructs. */
 /* buf[] has to be "" */
 static int
-trav2(buffer, dest, wdecl)
+trav2(char *buffer, char *dest, int wdecl)
+{
+  int result;
+  if (!asm_budget()) return SERR;
+  ++asm_depth;
+  result = trav2_impl(buffer, dest, wdecl);
+  --asm_depth;
+  return result;
+}
+
+static int
+trav2_impl(buffer, dest, wdecl)
   char   *buffer, *dest;
   int     wdecl;
 {
   int evalerr;
-  uChar   idxp = 0;
+  unsigned int idxp = 0;
   ref_st *tbl;
 
+next_token:
+  idxp = 0;
   switch (get_token(buffer, &idxp, token)) {
 
   case NONE:
@@ -1792,11 +1857,11 @@ trav2(buffer, dest, wdecl)
       if (statefine)
         return SNIL;
       else if (wdecl > SLBL) {
-        sprintf(buf, "%d", line);
-        if (isspace(buffer[idxp]))
+        snprintf(buf, sizeof(buf), "%d", line);
+        if (isspace((unsigned char)(buffer[idxp])))
           concat(buf, " ");
         if (concat(dest, buf))
-          return (trav2((char *) buffer + idxp, dest, wdecl));
+          goto advance_token;
         else
           errprn(BUFERR, aline, "");
       } else
@@ -1816,14 +1881,16 @@ trav2(buffer, dest, wdecl)
 
       else if (wdecl <= SLBL) {
 
-        uChar   j, op;
+        unsigned int j;
+        uChar op;
 
         for (j = 0; buf[j]; j++);
 
-        while (buffer[idxp] && !isspace(buffer[idxp]))
+        while (buffer[idxp] && !isspace((unsigned char)(buffer[idxp])))
           buf[j++] = buffer[idxp++];
 
-        if (isspace(buffer[idxp])) {
+        buf[j] = '\0';
+        if (isspace((unsigned char)(buffer[idxp]))) {
           buf[j++] = ' ';
           buf[j] = '\0';
         }
@@ -1844,6 +1911,11 @@ trav2(buffer, dest, wdecl)
               symnum = 0;
             }
             if (op < OPNUM) {
+              if (assembling && line >= instrLim) {
+                errprn(LINERR, aline, "1");
+                vcont = FALSE;
+                return SERR;
+              }
               line++;
               if (dbginfo == 2)
                 dbginfo++;
@@ -1861,10 +1933,10 @@ trav2(buffer, dest, wdecl)
 
       char    tmp = 1;
 
-      while ((buffer[idxp] == cat_sym) && (isalpha(buffer[idxp + 1])) &&
+      while ((buffer[idxp] == cat_sym) && (isalpha((unsigned char)(buffer[idxp + 1]))) &&
              (idxp++, get_token(buffer, &idxp, buf) == CHARTOKEN) && tmp)
         if (((tbl = lookup(buf)) != NULL) && (tbl->reftype == RSTACK)) {
-          sprintf(buf, "%02u", (unsigned int) tbl->value);
+          snprintf(buf, sizeof(buf), "%02u", (unsigned int) tbl->value);
           if (!concat(token, buf))
             errprn(BUFERR, aline, "");
         } else {
@@ -1877,21 +1949,24 @@ trav2(buffer, dest, wdecl)
           if (tbl->visit)
             errprn(RECERR, aline, token);
           else
-            return equsub((char *) buffer + idxp, dest, wdecl, tbl);
+            {
+              wdecl = equsub((char *) buffer + idxp, dest, wdecl, tbl);
+              goto advance_token;
+            }
 
         else if (wdecl > SLBL) {
           if (tbl->reftype == RSTACK)
-            sprintf(buf, "%02u", (unsigned int) tbl->value);
+            snprintf(buf, sizeof(buf), "%02u", (unsigned int) tbl->value);
           else if (wdecl == SPSE)
-            sprintf(buf, "%d", tbl->value);        /* absolute value */
+            snprintf(buf, sizeof(buf), "%d", tbl->value);        /* absolute value */
           else
-            sprintf(buf, "%d", tbl->value - line);        /* relative value */
+            snprintf(buf, sizeof(buf), "%d", tbl->value - line);        /* relative value */
 
-          if (isspace(buffer[idxp]))
+          if (isspace((unsigned char)(buffer[idxp])))
             concat(buf, " ");
 
           if (concat(dest, buf))
-            return (trav2((char *) buffer + idxp, dest, wdecl));
+            goto advance_token;
           else
             errprn(BUFERR, aline, "");
         } else
@@ -1908,17 +1983,17 @@ trav2(buffer, dest, wdecl)
           idxp++;
 
         /* traverse the rest of buffer */
-        return trav2((char *) buffer + idxp, dest, SLBL);
+        { wdecl = SLBL; goto advance_token; }
       } else {
-        if (isspace(buffer[idxp]))
+        if (isspace((unsigned char)(buffer[idxp])))
           concat(token, " ");
         if (concat(dest, token))
-          return (trav2((char *) buffer + idxp, dest, wdecl));
+          goto advance_token;
         else
           errprn(BUFERR, aline, "");
       }
     } else
-      return trav2((char *) buffer + idxp, dest, SNIL);
+      { wdecl = SNIL; goto advance_token; }
     break;
   default:
     if (statefine)
@@ -1927,12 +2002,17 @@ trav2(buffer, dest, wdecl)
       errprn(TOKERR, aline, token);
     else {
       if (concat(dest, token))
-        return trav2((char *) buffer + idxp, dest, wdecl);
+        goto advance_token;
       else
         errprn(BUFERR, aline, "");
     }
   }
   return SERR;
+
+advance_token:
+  buffer += idxp;
+  if (!asm_budget()) return SERR;
+  goto next_token;
 }
 
 /* ******************************************************************* */
@@ -1948,7 +2028,7 @@ expand(sspnt)
 
   vcont = TRUE;
   statefine = 0;
-  linemax = (uShrt) instrLim + LEXCMAX;
+
 
   aline = sline[sspnt];
   while (aline && vcont) {
@@ -1980,8 +2060,12 @@ parse(expr, cell, loc)
   long    resultA, resultB;
   mem_struct tmp;
   ADDR_T  dloc;
-  uChar   i = 0;
+  unsigned int i = 0;
   uShrt   sspnt = 0;
+
+  asm_work = 0;
+  asm_depth = 0;
+  assembling = FALSE;
 
   errnum = warnum = 0;
   ierr = 0;
@@ -2071,8 +2155,10 @@ assemble(fName, aWarrior)
   int     aWarrior;
 {
   FILE   *infp;
-  uChar   cont = TRUE, conLine = FALSE, i;
-  int     ri = 0;
+  uChar cont = TRUE, conLine = FALSE;
+  unsigned int i;
+  unsigned long input_bytes = 0;
+  int input_char;
   uShrt   lines;                /* logical and physical lines */
   uShrt   spnt = 0;                /* index/pointer to sline and lline */
 
@@ -2091,6 +2177,7 @@ assemble(fName, aWarrior)
 
   pass = 0;
 
+  cleanmem();
   srctbl = NULL;
   sline[0] = sline[1] = NULL;
   reftbl = NULL;
@@ -2100,9 +2187,13 @@ assemble(fName, aWarrior)
   lines = 0;
   ierr = 0;
 
+  FREE(errkeep);
   if ((errkeep = (err_st *) MALLOC(sizeof(err_st) * ERRMAX)) == NULL)
     MEMORYERROR;
 
+  asm_work = 0;
+  asm_depth = 0;
+  assembling = TRUE;
   curWarrior = aWarrior;
   warrior[curWarrior].name = pstrdup(unknown);
   warrior[curWarrior].authorName = pstrdup(anonymous);
@@ -2126,6 +2217,10 @@ assemble(fName, aWarrior)
         temp++;                        /* Bypass ":" */
     } else
       temp++;                        /* bypass "]" */
+    if (strlen(temp) > sizeof(DIAfilename) - 5) {
+      errprn(MISC, NULL, "Diagnostic filename too long");
+      Exit(PARSEERR);
+    }
     strcpy(DIAfilename, temp);
     temp = strstr(DIAfilename, ".");
     if (temp == NULL)
@@ -2168,28 +2263,46 @@ assemble(fName, aWarrior)
        * excluded. Need to be non-strict boolean evaluation
        */
       *buf = '\0';
-      ri = 0;                        /* pointer to line buffer start */
-      int commentfound = FALSE;
-      do {
-        if (fgets(buf + ri, MAXALLCHAR - ri, infp)) {
-          for (; buf[ri]; ri++) {
-            if (buf[ri] == ';') commentfound = TRUE;
-            if (buf[ri] == '\n' || buf[ri] == '\r')
-              break;
+      i = 0;                        /* pointer to line buffer start */
+      {
+        int commentfound = FALSE;
+        do {
+          conLine = FALSE;
+          while ((input_char = fgetc(infp)) != EOF) {
+            if (++input_bytes > ASM_MAX_INPUT) {
+              errprn(MISC, NULL, "Source exceeds input size limit");
+              Exit(PARSEERR);
             }
-          buf[ri] = 0;
-          if (ri > 0 && buf[ri - 1] == '\\' && commentfound == FALSE) {        /* line continued */
+            if (input_char == 0) {
+              errprn(MISC, NULL, "NUL byte in source");
+              Exit(PARSEERR);
+            }
+            if (input_char == '\n') break;
+            if (input_char == '\r') continue;
+            if (i >= MAXALLCHAR - 1) {
+              errprn(BUFERR, NULL, "");
+              Exit(PARSEERR);
+            }
+            if (input_char == ';') commentfound = TRUE;
+            buf[i++] = (char) input_char;
+          }
+          buf[i] = 0;
+          if (input_char == EOF) {
+            if (ferror(infp)) {
+              errprn(DSKERR, NULL, fName);
+              Exit(PARSEERR);
+            }
+            cont = FALSE;
+          } else if (i > 0 && buf[i - 1] == '\\' && !commentfound) {
             conLine = TRUE;
-            buf[--ri] = 0;        /* reset */
-          } else
-            conLine = FALSE;
-        } else if (ferror(infp)) {
-          errprn(DSKERR, (line_st *) NULL, fName);
-          fclose(infp);
-          return PARSEERR;
-        } else
-          cont = (feof(infp) == 0);
-      } while (conLine == TRUE);
+            buf[--i] = 0;
+          }
+        } while (conLine);
+      }
+      if (lines == USHRT_MAX) {
+        errprn(MISC, NULL, "Too many source lines");
+        Exit(PARSEERR);
+      }
       lines++;
       i = 0;
 
@@ -2318,28 +2431,28 @@ assemble(fName, aWarrior)
 #ifndef SERVER
     if (errnum + warnum) {
       if (*warrior[curWarrior].fileName)
-        sprintf(outs, "\nSource: filename '%s'\n", warrior[curWarrior].fileName);
+        snprintf(outs, sizeof(outs), "\nSource: filename '%s'\n", warrior[curWarrior].fileName);
       else
-        sprintf(outs, "\nSource: standard input (%s by %s)\n",
+        snprintf(outs, sizeof(outs), "\nSource: standard input (%s by %s)\n",
                 warrior[curWarrior].name, warrior[curWarrior].authorName);
       textout(outs);
     }
 #endif
     if (errnum) {
-      sprintf(outs, errNumMsg, errnum);
+      snprintf(outs, sizeof(outs), errNumMsg, errnum);
       textout(outs);
     }
     if (warnum) {
-      sprintf(outs, warNumMsg, warnum);
+      snprintf(outs, sizeof(outs), warNumMsg, warnum);
       textout(outs);
     }
     while (ierr)
       if (errkeep[--ierr].num > 1) {
-        sprintf(outs, duplicateMsg, errkeep[ierr].loc, errkeep[ierr].num);
+        snprintf(outs, sizeof(outs), duplicateMsg, errkeep[ierr].loc, errkeep[ierr].num);
         textout(outs);
       }
     if (errnum + warnum) {
-      sprintf(outs, "%s", "\n");
+      snprintf(outs, sizeof(outs), "%s", "\n");
       textout(outs);
     }
   } else

@@ -216,7 +216,7 @@ body()
       }
     }
 #ifdef PSPACE                        /* set up pSpace */
-  pspace_init();
+  if (errorcode == SUCCESS) pspace_init();
 #endif
   if (rounds && !SWITCH_A && (errorcode == SUCCESS)) {
     simulator1();

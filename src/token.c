@@ -29,7 +29,7 @@
 /* **************************** Prototype ******************************** */
 
 #ifdef NEW_STYLE
-#define toupper_(x) (toupper(x))
+#define toupper_(x) (toupper((unsigned char)(x)))
 #else
 #define toupper_(x) (isalpha(x) && islower(x) ? toupper(x) : (x))
 #endif
@@ -38,7 +38,7 @@
 
 #define is_addr(ch)  pstrchr(addr_sym, (int) ch)
 #define is_expr(ch)  pstrchr(expr_sym, (int) ch)
-#define is_alpha(ch) (isalpha(ch) || (ch) == '_')
+#define is_alpha(ch) (isalpha((unsigned char)(ch)) || (ch) == '_')
 
 /* ********************************************************************** */
 
@@ -127,14 +127,13 @@ str_in_set(str, s)
 /* ********************************************************************** */
 
 /* return next char which is non-whitespace char */
-uChar 
+unsigned int
 skip_space(str, i)
   char   *str;
-  uShrt   i;
+  unsigned int i;
 {
-  register uChar idx;
-  idx = (uChar) i;
-  while (isspace(str[idx]))
+  unsigned int idx = i;
+  while (isspace((unsigned char)str[idx]))
     idx++;
   return (idx);
 }
@@ -155,24 +154,26 @@ to_upper(str)
 int 
 get_token(str, curIndex, token)
   char   *str, *token;
-  uChar  *curIndex;
+  unsigned int *curIndex;
 {
-  register uChar src, dst = 0;
+  unsigned int src, dst = 0;
   register int ch;                /* int for ctype compliance */
   int     tokenType;
 
-  src = skip_space(str, (uShrt) * curIndex);
+  src = skip_space(str, *curIndex);
 
   if (str[src])
-    if (isdigit(ch = str[src])) {        /* Grab the whole digit */
-      while (isdigit(str[src]))
-        token[dst++] = str[src++];
+    if (isdigit(ch = (unsigned char)str[src])) {        /* Grab the whole digit */
+      while (isdigit((unsigned char)str[src]))
+        if (dst < MAXALLCHAR - 1) token[dst++] = str[src++];
+        else { token[dst] = 0; *curIndex = src; return MISCTOKEN; }
       tokenType = NUMBTOKEN;
     }
   /* Grab the whole identifier. There would be special treatment to modifiers */
     else if (is_alpha(ch)) {
-      for (; ((ch = str[src]) != '\0') && (is_alpha(ch) || isdigit(ch));)
-        token[dst++] = str[src++];
+      for (; ((ch = (unsigned char)str[src]) != '\0') && (is_alpha(ch) || isdigit(ch));)
+        if (dst < MAXALLCHAR - 1) token[dst++] = str[src++];
+        else { token[dst] = 0; *curIndex = src; return MISCTOKEN; }
       tokenType = CHARTOKEN;
     }
   /*

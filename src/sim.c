@@ -195,7 +195,7 @@ checksum_warriors()
 
 {
   int     shuffle = 0;                /* XOR with position-dependent int */
-  S32_T   checksum = 0;                /* accumulator */
+  U32_T   checksum = 0;                /* defined unsigned wraparound */
   mem_struct *source;
   mem_struct *last;
 
@@ -217,7 +217,7 @@ checksum_warriors()
     }
     ++W;
   } while (W < endWar);
-  return checksum;
+  return (S32_T)(checksum & INT_MAX);
 }
 
 #ifdef RWLIMIT
@@ -253,7 +253,7 @@ simulator1()
   ADDR_T  coreSize1 = coreSize - 1;
   warrior_struct *starter = warrior;        /* pointer to warrior that starts
 					 * round */
-  U32_T   cycles2 = warriors * cycles;
+  U32_T   cycles2 = (U32_T)warriors * (U32_T)cycles;
 #ifndef SERVER
   char    outs[60];                /* for cdb() entering message */
 #endif
@@ -1282,7 +1282,7 @@ if (IR.B_mode != (FIELD_T) IMMEDIATE)
 
 #ifndef SERVER
 	if (debugState == BREAK) {
-	  sprintf(outs, warriorTerminated, W - warrior, W->name);
+	  snprintf(outs, sizeof(outs), warriorTerminated, W - warrior, W->name);
 	  debugState = cdb(outs);
 	}
 #endif                                /* SERVER */
@@ -1420,13 +1420,13 @@ nextround:
 #ifndef SERVER
     if (debugState == BREAK) {
       if (warriorsLeft == 1 && warriors != 1)
-	sprintf(outs, warriorTerminatedEndOfRound, W - warrior, W->name, round_num);
+	snprintf(outs, sizeof(outs), warriorTerminatedEndOfRound, W - warrior, W->name, round_num);
       else
-	sprintf(outs, endOfRound, round_num);
+	snprintf(outs, sizeof(outs), endOfRound, round_num);
       debugState = cdb(outs);
     }
 #endif
-  } while (++round_num <= rounds);
+  } while (round_num < rounds && (++round_num, TRUE));
 
   display_close();
 #ifdef PERMUTATE
