@@ -1,0 +1,53 @@
+name: Regressions
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: regressions-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y build-essential
+      - name: Build server and run regression tests
+        run: make -C src check
+      - name: Build console with debugger
+        run: make -C src default
+
+  windows:
+    name: Windows regressions
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-make
+            mingw-w64-ucrt-x86_64-python
+      - name: Build server and run regression tests
+        run: mingw32-make -C src check
+      - name: Build console with debugger
+        run: mingw32-make -C src default
