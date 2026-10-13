@@ -17,23 +17,31 @@ jobs:
   linux:
     name: Linux regressions
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
       - name: Install build tools
-        run: sudo apt-get update && sudo apt-get install -y build-essential
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake pkg-config \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev \
+            libxfixes-dev libxss-dev libxtst-dev libxkbcommon-dev libwayland-dev \
+            libegl1-mesa-dev libgl1-mesa-dev libasound2-dev libpulse-dev \
+            libudev-dev libdbus-1-dev libdrm-dev libgbm-dev libdecor-0-dev
       - name: Build server and run regression tests
         run: make -C src check
       - name: Build console with debugger
         run: make -C src default
+      - name: Build SDL3 and run display regressions
+        run: make -C src check-sdl
 
   windows:
     name: Windows regressions
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     defaults:
       run:
         shell: msys2 {0}
@@ -47,7 +55,15 @@ jobs:
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-make
             mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-SDL3
       - name: Build server and run regression tests
         run: mingw32-make -C src check
       - name: Build console with debugger
         run: mingw32-make -C src default
+      - name: Build GDI and run display regressions
+        run: mingw32-make -C src check-gdi
+      - name: Build SDL3 and run display regressions
+        run: mingw32-make -C src check-sdl
+      - name: Test installed shared SDL3
+        run: mingw32-make -C src check-sdl SDL_PROVIDER=system

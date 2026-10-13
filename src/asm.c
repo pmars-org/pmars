@@ -736,7 +736,7 @@ textout(str)
   else
     xWin_puts(str);
 #else 
-#if defined(SDLGRAPHX)
+#if defined(SOFTGRAPHX)
   else
     sdlgr_puts(str);
 #else
@@ -747,7 +747,7 @@ textout(str)
   else
     fprintf(stderr, "%s", str);
 #endif                                /* STDGRAPHX */
-#endif                                /* SDLGRAPHX */
+#endif                                /* SOFTGRAPHX */
 #endif                                /* XWINGRAPHX */
 #endif                                /* LINUXGRAPHX */
 #endif                                /* DOSGRXGRAPHX */

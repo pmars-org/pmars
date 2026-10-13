@@ -1,0 +1,8 @@
+/src/*.o
+/src/*.exe
+/src/pmars
+/src/pmars-server
+/src/pmars-sdl3
+/security/build/
+/build-sdl3/
+/build-sdl3-*/

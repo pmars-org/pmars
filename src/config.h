@@ -325,9 +325,20 @@
 #define DJGPP
 #endif
 
+/* Bitmap display/debugger interface; select one platform renderer. */
+#if defined(GDIGRAPHX) && !defined(_WIN32)
+#error GDIGRAPHX requires Windows
+#endif
+#if defined(GDIGRAPHX) && defined(SDLGRAPHX)
+#error Select either GDIGRAPHX or SDLGRAPHX
+#endif
+#if defined(GDIGRAPHX) || defined(SDLGRAPHX)
+#define SOFTGRAPHX
+#endif
+
 #if (defined(DOSTXTGRAPHX) && defined(DOSGRXGRAPHX)) || defined(OS2PMGRAPHX)\
     || defined(MACGRAPHX) || defined(CURSESGRAPHX) || defined(DOSALLGRAPHX)\
-     || defined(LINUXGRAPHX) || defined(XWINGRAPHX) || defined(SDLGRAPHX)
+     || defined(LINUXGRAPHX) || defined(XWINGRAPHX) || defined(SOFTGRAPHX)
 #ifndef GRAPHX
 #define GRAPHX
 #endif
@@ -413,7 +424,7 @@
 #endif
 #endif
 
-#if defined(SDLGRAPHX)
+#if defined(SOFTGRAPHX)
 #ifdef CURSESGRAPHX
 #undef CURSESGRAPHX
 #endif

@@ -46,3 +46,9 @@ Language support
     native tongue, translate the strings and send the file to us. We will then
     include the new str_???.c in the next release and might even release the
     foreign language binaries.
+
+____________________
+GDI and SDL3 builds
+
+    See BUILD-DISPLAYS.md for make gdi, make sdl and regression test commands.
+    The original console, server, curses and X Windows targets remain available.

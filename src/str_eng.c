@@ -80,12 +80,12 @@ char   *helpText[] = {
   "Information:  help     progress registers\n",
   "Macro:        calc     echo     if       macro    remark   reset\n",
 #if defined(DOSGRXGRAPHX) || defined(DOSTXTGRAPHX) || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
   "Display:      clear    close    display  switch\n",
 #else
   "Display:      clear\n",
 #endif
-#if defined(__MAC__) || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+#if defined(__MAC__) || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
   "Others:       pqueue   wqueue   pspace   write\n",
 #else
   "Others:       pqueue   wqueue   pspace   shell    write\n",
@@ -95,12 +95,12 @@ char   *helpText[] = {
   "(ca)lc expr1[,expr2]   calculate expression(s) and echo result(s)\n",
   "(cl)ear                clear cdb screen\n",
 #if defined(DOSGRXGRAPHX) || defined(DOSTXTGRAPHX) || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX)
   "(clo)se                close right cdb panel and make left full-screen\n",
 #endif
   "(c)ontinue *           exit cdb and finish simulation\n",
 #if defined(CURSESGRAPHX) || defined(DOSTXTGRAPHX) || defined(DOSGRXGRAPHX) \
-    || defined(LINUXGRAPHX) || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+    || defined(LINUXGRAPHX) || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
   "(d)isplay clear|on|off|nnn\n",
   "                       clear, turn core display on/off or set -v option to nnn\n",
 #endif
@@ -125,13 +125,13 @@ char   *helpText[] = {
   "(rem)ark string        macro comment\n",
   "(res)et                terminate macro/command chain processing\n",
   "(se)arch pattern       search for wildcarded pattern in core\n",
-#if !defined(__MAC__) && !defined(XWINGRAPHX) && !defined(SDLGRAPHX)
+#if !defined(__MAC__) && !defined(XWINGRAPHX) && !defined(SOFTGRAPHX)
   "(sh)ell [command]      execute OS command\n",
 #endif
   "(sk)ip [count]         execute [count] steps silently\n",
   "(s)tep *               execute next queued instruction\n",
 #if defined(DOSGRXGRAPHX) || defined(DOSTXTGRAPHX) || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX)
   "(sw)itch [1|2]         switch to left (1), right (2), or other cdb panel\n",
 #endif
   "(th)read *             step through current thread\n",
@@ -190,7 +190,7 @@ char   *cannotAllocateScreenBuffers = "Cannot allocate textmode screen buffers\n
 
 /* strings shared between displays */
 #if defined(DOSTXTGRAPHX) || defined(DOSGRXGRAPHX) || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
 char   *pressAnyKey = "Press any key ..";
 #endif
 #ifdef DOSGRXGRAPHX
@@ -217,16 +217,20 @@ char   *invalidGeom = "Invalid geometry specification\n";
 #endif                                /* XWINGRAPHX */
 
 /* sdldisp.c strings here */
-#ifdef SDLGRAPHX
+#ifdef SOFTGRAPHX
 char   *badModeString = "Invalid mode string";
+#ifdef GDIGRAPHX
+char   *failedSDLInit = "Failed to initialise Win32/GDI";
+#else
 char   *failedSDLInit = "Failed to initialise SDL";
+#endif
 char   *errDisplayOpen = "Couldn't open display";
 char   *errSpriteConv = "Couldn't convert sprite to display format";
 char   *errSpriteColKey = "Couldn't set colorkey for sprite";
 char   *errSpriteSurf = "Couldn't create surface for sprite";
 char   *errSpriteFill = "Failed to fill sprite";
 char   *errorHeader = "Error: %s";
-#endif                                /* SDLGRAPHX */
+#endif                                /* SOFTGRAPHX */
 
 /* pmars.c */
 
@@ -344,9 +348,13 @@ char   *credits_screen3 =
 char   *credits_screen3 =
 "Linux/SVGA display version by Martin Maierhofer\n";
 #else
-#ifdef SDLGRAPHX
+#ifdef SOFTGRAPHX
 char   *credits_screen3 =
+#ifdef GDIGRAPHX
+"Win32/GDI display using the pMARS SDL renderer\n";
+#else
 "SDL display version by M Joonas Pihlaja\n";
+#endif
 #else
 #ifdef STDGRAPHX
 char   *credits_screen3 =
@@ -354,7 +362,7 @@ char   *credits_screen3 =
 #else
 char   *credits_screen3 = "";
 #endif                                /* STDGRAPHX */
-#endif 		                      /* SDLGRAPHX */
+#endif 		                      /* SOFTGRAPHX */
 #endif                                /* LINUXGRAPHX */
 #endif                                /* MACGRAPHX */
 #endif                                /* DOSTXTGRAPHX */
@@ -415,7 +423,7 @@ char   *optFixedSeries = "Fixed position series";
 char   *optFixedPosition = "Fixed position of warrior #2";
 char   *optSort = "Sort result output by score";
 #if defined(DOSTXTGRAPHX) || defined(DOSGRXGRAPHX) || defined(LINUXGRAPHX)\
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
 char   *optView = "Coreview mode [103]";
 #endif
 char   *optScoreFormula = "Score formula $ [(W*W-1)/S]";
@@ -433,6 +441,9 @@ char   *optReadLimit = "Read limit size";
 char   *optWriteLimit = "Write limit size";
 #endif
 char   *optAssemble = "Assemble warriors only";
+#ifdef SOFTGRAPHX
+char   *optScreenMode = "Graphics screen mode $ [640x480]";
+#endif
 #if defined(XWINGRAPHX)
 char   *optXOpt[] = {
   "Display to connect to",

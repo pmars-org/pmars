@@ -22,7 +22,7 @@
  */
 
 #include <stdio.h>
-#if defined(unix) || defined(VMS) || defined(SDLGRAPHX)
+#if defined(unix) || defined(VMS) || defined(SOFTGRAPHX)
 #include <signal.h>
 #else
 #if defined(__MSDOS__)
@@ -30,6 +30,12 @@
 #endif
 #endif
 #include "global.h"
+#ifdef SOFTGRAPHX
+#include <signal.h>
+#ifdef _WIN32
+#include <io.h>
+#endif
+#endif
 
 #if defined(LINUXGRAPHX)
 #include <vga.h>
@@ -40,12 +46,12 @@
 #endif
 
 #if defined(SDLGRAPHX)
-/* Including SDL.h here makes sure main() is renamed to whatever SDL needs. */
-#include "SDL.h"
+/* SDL_main.c provides the console entry and SDL3 platform setup. */
+#define main pmars_main
 #endif
 
 #if defined(DOSTXTGRAPHX) || defined(DOSGRXGRAPHX) || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX)
 #if defined(DJGPP)
 #include <std.h>
 #else
@@ -77,7 +83,7 @@ int     returninfo(void);
 #ifdef PSPACE
 void    pspace_init(void);
 #endif
-#if defined(unix) || defined(__MSDOS__) || defined(SDLGRAPHX) || defined(VMS)
+#if defined(unix) || defined(__MSDOS__) || defined(SOFTGRAPHX) || defined(VMS)
 void    sighandler(int dummy);
 #endif
 #if defined(CURSESGRAPHX)
@@ -92,7 +98,7 @@ int     returninfo();
 #ifdef PSPACE
 void    pspace_init();
 #endif
-#if defined(unix) || defined(__MSDOS__) || defined(SDLGRAPHX)
+#if defined(unix) || defined(__MSDOS__) || defined(SOFTGRAPHX)
 void    sighandler();
 #endif
 #if defined(CURSESGRAPHX)
@@ -139,7 +145,7 @@ is386:
 #endif
 
 #if defined(DOSTXTGRAPHX) || defined(DOSGRXGRAPHX) || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
 void
 decode_vopt(option)
   int     option;
@@ -161,7 +167,7 @@ decode_vopt(option)
   loopDelay = loopDelayAr[displaySpeed];
   keyDelay = keyDelayAr[displaySpeed];
 #endif
-#if defined(SDLGRAPHX)
+#if defined(SOFTGRAPHX)
   sdlgr_set_displayLevel(displayLevel);
   sdlgr_set_displaySpeed(displaySpeed);
   sdlgr_set_displayMode(displayMode);
@@ -184,12 +190,16 @@ init()
   errorlevel = WARNING;                /* reserve for future */
   errmsg[0] = '\0';                /* reserve for future */
 #if defined(DOSTXTGRAPHX) || defined(DOSGRXGRAPHX) || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
   decode_vopt(SWITCH_v);
 #endif
 #if defined(DOSTXTGRAPHX) || defined(DOSGRXGRAPHX) || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || (defined(SDLGRAPHX) && !defined(WIN32))
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX)
+#if defined(SOFTGRAPHX) && defined(_WIN32)
+  if (!_isatty(_fileno(stdin)))
+#else
   if (!isatty(fileno(stdin)))
+#endif
     inputRedirection = TRUE;
 #endif
 }
@@ -239,7 +249,7 @@ body()
 }
 
 /* called when ctrl-c is pressed; prepares for debugger entry */
-#if defined(unix) || defined(__MSDOS__) || defined (__OS2__) || defined(SDLGRAPHX)
+#if defined(unix) || defined(__MSDOS__) || defined (__OS2__) || defined(SOFTGRAPHX)
 void
 #ifdef __OS2__
         _cdecl
