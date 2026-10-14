@@ -2,6 +2,27 @@
 #include <assert.h>
 #include "../src/gdidisp.c"
 
+/* Choose a physical pixel inside logical pixel (160,120). Truncating
+ * client_size/4 can land just BEFORE that pixel when Windows clamps a window
+ * to a smaller desktop, or the client dimensions are not divisible by four. */
+static void check_mouse_mapping(void)
+{
+    RECT client;
+    SDL_Event event;
+    int x, y;
+    while(SDL_PollEvent(&event)) { }
+    GetClientRect(window,&client);
+    assert(client.right >= 640 && client.bottom >= 480);
+    x=(160*client.right+639)/640;
+    y=(120*client.bottom+479)/480;
+    SendMessageW(window,WM_LBUTTONDOWN,0,MAKELPARAM(x,y));
+    assert(SDL_PollEvent(&event) && event.type==SDL_MOUSEBUTTONDOWN);
+    if(event.button.x!=160 || event.button.y!=120)
+        fprintf(stderr,"client %ld x %ld, click %d,%d mapped to %d,%d\n",
+                client.right,client.bottom,x,y,event.button.x,event.button.y);
+    assert(event.button.x==160 && event.button.y==120);
+}
+
 int main(void)
 {
     RECT client, target;
@@ -29,17 +50,20 @@ int main(void)
         OffsetRect(&target,100-target.left,100-target.top);
         SendMessageW(window,WM_DPICHANGED,MAKELONG(dpi,dpi),(LPARAM)&target);
         assert(window_dpi==dpi && screen->w==640 && screen->h==480);
-        while(SDL_PollEvent(&event)) { }
-        GetClientRect(window,&client);
-        SendMessageW(window,WM_LBUTTONDOWN,0,
-                     MAKELPARAM(client.right/4,client.bottom/4));
-        assert(SDL_PollEvent(&event) && event.type==SDL_MOUSEBUTTONDOWN);
-        assert(event.button.x==160 && event.button.y==120);
+        check_mouse_mapping();
         SendMessageW(window,WM_SIZE,SIZE_RESTORED,
                      MAKELPARAM(MulDiv(800,dpi,96),MulDiv(600,dpi,96)));
         assert(SDL_PollEvent(&event) && event.type==SDL_VIDEORESIZE);
         assert(event.resize.w==800 && event.resize.h==600);
     }
+    /* Exercise the rounding case even on a large desktop. */
+    target.left=target.top=0; target.right=641; target.bottom=481;
+    AdjustWindowRectExForDpi(&target,WS_OVERLAPPEDWINDOW,FALSE,0,GetDpiForWindow(window));
+    assert(SetWindowPos(window,NULL,0,0,target.right-target.left,
+                        target.bottom-target.top,SWP_NOMOVE|SWP_NOZORDER));
+    GetClientRect(window,&client);
+    assert(client.right==641 && client.bottom==481);
+    check_mouse_mapping();
     SDL_FreeSurface(surface);
     SDL_Quit();
     puts("PASS: GDI window sizing, DPI changes, logical resize and mouse at 100/125/150/200%");
