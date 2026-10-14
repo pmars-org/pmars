@@ -15,6 +15,11 @@ system display libraries. macOS builds target macOS 11 or newer; they are
 not signed with a Developer ID or notarized. Test on the supported systems
 before advertising a particular minimum OS as verified.
 
+Release packages contain stripped executables, with no separate debug-symbol
+download. The included source can be rebuilt with `NO_STRIPPING=1` and debug
+compiler flags; see BUILD-DISPLAYS.md. Stripping does not remove the cdb
+Redcode debugger from console or graphics builds.
+
 ## Try a build
 
 Pull requests and pushes to `main` build all four platforms without publishing

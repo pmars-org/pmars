@@ -32,6 +32,34 @@ sources separately from console/display objects; SDL3 has its own CMake
 build directory. Run `make clean` before switching between the legacy
 `default`, `curses` and `xwin` targets. Cleaning preserves extracted SDL source.
 
+## Executable symbols and debugging pMARS
+
+GNU Make strips symbols from the generated console, server, GDI and SDL3
+executables by default. Set `NO_STRIPPING=1` to keep them, and use `STRIP=...`
+to select the strip tool when cross-compiling. This does not disable cdb:
+the Redcode debugger remains available in console and graphics builds.
+
+Keeping symbols and generating debug information are separate settings.
+For a console build suitable for a native debugger such as GDB, rebuild with:
+
+```sh
+make -C src -B default NO_STRIPPING=1 CFLAGS="-O0 -g -std=c99 -DEXT94 -DPERMUTATE"
+```
+
+Use `server` or `gdi` instead of `default` for those variants. For SDL3:
+
+```sh
+make -C src sdl NO_STRIPPING=1 SDL_BUILD_TYPE=Debug SDL_BUILD_DIR=../build-sdl3-debug \
+  CFLAGS="-O0 -g -std=c99 -DEXT94 -DPERMUTATE"
+```
+
+Use `SDL_BUILD_TYPE=RelWithDebInfo` for an optimized SDL build with debug
+information. With direct CMake builds, use `-DCMAKE_BUILD_TYPE=Debug` or
+`RelWithDebInfo`; direct CMake build outputs are not stripped. GNU Make strips
+only the copied SDL executable in `src/`, preserving the CMake build output.
+When changing `NO_STRIPPING` or compiler flags for the console, use `-B` to
+rebuild: stripping cannot restore symbols to an existing executable.
+
 ## Tests
 
 - `make check`: headless security, compatibility and expression tests.

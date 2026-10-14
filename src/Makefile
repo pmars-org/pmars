@@ -31,6 +31,15 @@
 
 CFLAGS += -O2 -DEXT94 -DPERMUTATE
 
+# Strip distributable executables by default. Keeping symbols does not add
+# debug information: use -g (or SDL_BUILD_TYPE=Debug) when debugging pMARS.
+NO_STRIPPING ?= 0
+STRIP ?= strip
+ifeq (,$(filter $(NO_STRIPPING),0 1))
+$(error NO_STRIPPING must be 0 or 1)
+endif
+strip_binary = $(if $(filter 0,$(NO_STRIPPING)),"$(STRIP)" "$(1)")
+
 # Optional absolute fallback for package managers with nonstandard layouts.
 # Use forward slashes in Windows paths.
 ifneq ($(strip $(PMARS_DATADIR)),)
@@ -124,6 +133,8 @@ help:
 	@echo "  make check-console  run hardened console and debugger regressions"
 	@echo "  make clean          remove objects and generated executables"
 	@echo "                      (use before switching display builds)"
+	@echo "  NO_STRIPPING=1      keep executable symbols (default: strip)"
+	@echo "  STRIP=path/to/strip select the target toolchain's strip program"
 
 curses: CFLAGS += -DCURSESGRAPHX
 curses: LIBS = -lncurses
@@ -138,6 +149,7 @@ check-sdl3: check-sdl
 gdi:
 ifneq (,$(EXEEXT))
 	$(CC) $(CPPFLAGS) $(CONFIG_CPPFLAGS) $(CFLAGS) $(GDI_EXTRA_CFLAGS) -DGDIGRAPHX $(CORE_SOURCES) gdidisp.c $(LDFLAGS) $(GDI_LDFLAGS) $(GDI_LIBS) -o "$(GDI_PROGRAM)"
+	$(call strip_binary,$(GDI_PROGRAM))
 else
 	$(error GDI requires a Windows-targeting compiler; use make sdl)
 endif
@@ -157,6 +169,7 @@ sdl:
 	$(SDL_CONFIGURE)
 	"$(CMAKE)" --build "$(SDL_BUILD_DIR)" --target pmars-sdl3 --parallel $(JOBS)
 	"$(CMAKE)" -E copy_if_different "$(SDL_BUILD_DIR)/pmars-sdl3$(EXEEXT)" "$(SDL_PROGRAM)"
+	$(call strip_binary,$(SDL_PROGRAM))
 
 check-sdl: sdl
 	"$(CMAKE)" -S .. -B "$(SDL_BUILD_DIR)" -DPMARS_BUILD_EVENT_TESTS=ON
@@ -171,6 +184,7 @@ check-sdl-native: check-sdl
 # switching from a display build must never reuse incompatible object files.
 server:
 	$(CC) $(CPPFLAGS) $(CONFIG_CPPFLAGS) $(CFLAGS) -std=c99 -DSERVER $(HARDEN_CFLAGS) $(SOURCES) $(LDFLAGS) $(HARDEN_LDFLAGS) -o $(SERVERFILE)
+	$(call strip_binary,$(SERVERFILE))
 
 check-console: default server
 	$(PYTHON) ../security/test_security.py ./$(MAINFILE) ./$(SERVERFILE)
@@ -194,7 +208,7 @@ OBJ = pmars.o asm.o eval.o disasm.o cdb.o sim.o pos.o clparse.o configpath.o glo
 $(MAINFILE): $(OBJ)
 	@echo Linking $@
 	@$(CC) $(LDFLAGS) $(HARDEN_LDFLAGS) -o $@ $^ $(LIBS)
-	@strip $@
+	$(call strip_binary,$@)
 	@echo Done
 
 token.o asm.o disasm.o: asm.h
