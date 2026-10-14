@@ -24,6 +24,9 @@ settings. The headless server build (`make server` in `src`) remains available.
 
 ## Controls
 
+- Windows display scaling (including 150%) enlarges the window, bitmap text
+  and core cells. Moving between monitors updates the scale. `-m` dimensions
+  are logical pixels at 100% scaling.
 - Resize or maximize the window to recompute the core and debugger layout.
 - Alt+Enter toggles borderless fullscreen on the current monitor, scaling
   the bitmap; toggling back restores the previous window rectangle.
