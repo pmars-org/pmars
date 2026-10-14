@@ -30,7 +30,7 @@ jobs:
           python scripts/test_release_package.py --platform source
       - uses: actions/upload-artifact@v7
         with:
-          name: release-input-source
+          name: build-source
           path: dist/*.zip
           if-no-files-found: error
           compression-level: 0
@@ -125,7 +125,7 @@ jobs:
           python scripts/test_release_package.py --platform "$PACKAGE_PLATFORM"
       - uses: actions/upload-artifact@v7
         with:
-          name: release-input-${{ matrix.platform }}
+          name: build-${{ matrix.platform }}
           path: dist/*.zip
           if-no-files-found: error
           compression-level: 0
@@ -143,14 +143,14 @@ jobs:
           python-version: '3.13'
       - uses: actions/download-artifact@v8
         with:
-          pattern: release-input-*
+          pattern: build-*
           path: dist
           merge-multiple: true
       - name: Require all five matching archives
         run: python scripts/package_release.py checksums
       - uses: actions/upload-artifact@v7
         with:
-          name: release-downloads
+          name: all-platforms-downloads
           path: dist/*
           if-no-files-found: error
           compression-level: 0
@@ -167,7 +167,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: release-downloads
+          name: all-platforms-downloads
           path: dist
       - name: Create release with all verified assets
         env:
