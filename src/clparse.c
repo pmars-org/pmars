@@ -79,6 +79,10 @@ extern char *credits_screen1, *credits_screen2, *credits_screen3, *usage_screen,
 extern char *optReadLimit, *optWriteLimit, *badRWLimit;
 #endif
 
+#ifdef SOFTGRAPHX
+extern char *sdlgr_Storage[], *optScreenMode;
+#endif
+
 #if defined(XWINGRAPHX)
 extern char *badArgumentForXSwitch, *optXOpt[];
 #endif
@@ -516,7 +520,7 @@ parse_param(largc, largv)
   * command line parameters and options                              *
   ********************************************************************/
 
-#define OPTNUM 23                /* don't forget to increase when adding new
+#define OPTNUM 24                /* don't forget to increase when adding new
                                  * options */
   static clp_opt_t options[OPTNUM];
   int     optI = 0;                /* used by record() macro */
@@ -577,7 +581,7 @@ parse_param(largc, largv)
   record('=', clp_str, &SWITCH_eq, 0, 0, 0, optScoreFormula);
   record('Q', clp_int, &SWITCH_Q, -1, INT_MAX, -1, NULL);
 #if defined(DOSTXTGRAPHX) || defined(DOSGRXGRAPHX)  || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
 #if defined(XWINGRAPHX)
 #define V_MAX        2994
 #else
@@ -586,6 +590,9 @@ parse_param(largc, largv)
   record('v', clp_int, &SWITCH_v, 0, V_MAX,
          103, optView);
 #undef V_MAX
+#endif
+#ifdef SOFTGRAPHX
+  record('m', clp_str, &sdlgr_Storage[0], 0, 0, 0, optScreenMode);
 #endif
 #if defined(VMS)
   record('D', clp_bool, &SWITCH_D, 0, 1, 0,

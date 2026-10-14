@@ -70,7 +70,7 @@ unsigned long loopDelay;
 unsigned long loopDelayAr[SPEEDLEVELS] = {1, 1, 1, 100, 500, 2500, 10000, 40000, 100000};
 
 #if defined(DOSTXTGRAPHX) || defined(DOSGRXGRAPHX) || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
 int     SWITCH_v;
 int     displayLevel;
 int     displayMode;
@@ -83,7 +83,11 @@ int     refreshInterval;
 int     refIvalAr[SPEEDLEVELS] = {50, 20, 10, 3, 2, 1, 1, 1, 1};
 #else
 int     keyDelay;
+#ifdef SOFTGRAPHX
+int keyDelayAr[SPEEDLEVELS] = {1521, 523, 213, 153, 53, 21, 3, 2, 1};
+#else
 int     keyDelayAr[SPEEDLEVELS] = {31, 15, 7, 3, 1, 1, 1, 1, 1};
+#endif
 #endif
 #endif
 
@@ -91,7 +95,7 @@ int     inCdb = FALSE;
 int     debugState = NOBREAK;
 int     copyDebugInfo = TRUE;
 #if defined(DOSTXTGRAPHX) || defined(DOSGRXGRAPHX) || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
 int     inputRedirection = FALSE;
 #endif
 mem_struct INITIALINST;                /* initialize to DAT.F $0,$0 */

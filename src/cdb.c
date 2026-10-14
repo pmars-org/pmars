@@ -39,11 +39,11 @@
 
 #define VERBLEN 3
 #define SKIP_SPACE(s) while(isspace(*s)) ++s
-#if defined(XWINGRAPHX) || defined(SDLGRAPHX) /* need this string externally */
+#if defined(XWINGRAPHX) || defined(SOFTGRAPHX) /* need this string externally */
 char   *CDB_PROMPT = "(cdb) ";
 #else
 #define CDB_PROMPT "(cdb) "
-#endif /* XWINGRAPHX | SDLGRAPHX */
+#endif /* XWINGRAPHX | SOFTGRAPHX */
 #define CMDSEP '~'                /* chain command separator */
 #define CMDREP '!'                /* chain command repeator */
 #define MAXSTR MAXALLCHAR /* 80 */        /* general buffer length */
@@ -328,7 +328,7 @@ char    outs[MAXSTR + 1], buffer1[MAXSTR + 1], buffer2[MAXSTR + 1];
 char   *xInpP;                        /* pointer to inputStr[], used by
                                  * input-requiring functions called by cdb() */
 #if defined(DOSTXTGRAPHX) || defined(DOSGRXGRAPHX) || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
 
 int     printAttr;
 int     curPanel = 0;
@@ -395,10 +395,10 @@ cdb(message)
 #if defined(STDGRAPHX)
   stdio_write_menu();
 #else
-#if defined(SDLGRAPHX)
+#if defined(SOFTGRAPHX)
   sdlgr_write_menu();
   sdlgr_refresh(-1);
-#endif /* SDLGRAPHX */
+#endif /* SOFTGRAPHX */
 #endif /* STDGRAPHX */
 #endif /* XWINGRAPHX */
 #endif /* LINUXGRAPHX */
@@ -473,7 +473,7 @@ cdb(message)
 #if defined(XWINGRAPHX)
       xWin_clear();
 #else
-#if defined(SDLGRAPHX)
+#if defined(SOFTGRAPHX)
       sdlgr_clear();
 #else
 #if defined(STDGRAPHX)
@@ -481,7 +481,7 @@ cdb(message)
 #else
        cdb_fputs(CLRSCR, COND);        /* escape sequence for your terminal */
 #endif				      /* STDGRAPHX */
-#endif                                /* SDLGRAPHX */
+#endif                                /* SOFTGRAPHX */
 #endif                                /* XWINGRAPHX */
 #endif                                /* LINUXGRAPHX */
 #endif                                /* MACGRAPHX */
@@ -491,7 +491,7 @@ cdb(message)
 #endif                                /* ALL */
       break;
 #if defined(DOSGRXGRAPHX) || defined(DOSTXTGRAPHX) || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
     case CLO_H:                /* close display panel 2 */
       if (curPanel == 2) {
         i = curAddr;
@@ -513,7 +513,7 @@ cdb(message)
 #if defined(XWINGRAPHX)
       xWin_update(0);
 #else
-#if defined(SDLGRAPHX)
+#if defined(SOFTGRAPHX)
       sdlgr_update(0);
 #else
 #if defined(STDGRAPHX)
@@ -521,7 +521,7 @@ cdb(message)
 #else
       grupdate(0);
 #endif				      /* STDGRAPHX */
-#endif                                /* SDLGRAPHX */
+#endif                                /* SOFTGRAPHX */
 #endif                                /* XWINGRAPHX */
 #endif                                /* LINUXGRAPHX */
 #endif                                /* DOSTXTGRAPHX */
@@ -542,7 +542,7 @@ cdb(message)
       inCdb = FALSE;
       break;
 #if defined(CURSESGRAPHX) || defined(DOSTXTGRAPHX) || defined(DOSGRXGRAPHX) \
-    || defined(LINUXGRAPHX) || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+    || defined(LINUXGRAPHX) || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
     case DIS_H:
     case DI_H:
     case D_H:
@@ -563,7 +563,7 @@ cdb(message)
 #if defined(LINUXGRAPHX)
           svga_clear_arena();
 #else
-#if defined(SDLGRAPHX)
+#if defined(SOFTGRAPHX)
 	  sdlgr_clear_arena();
 #else
 #if defined(STDGRAPHX)
@@ -601,7 +601,7 @@ cdb(message)
 #if defined(XWINGRAPHX)
             xWin_resize();
 #endif
-#if defined(SDLGRAPHX)
+#if defined(SOFTGRAPHX)
 	    sdlgr_set_displayLevel(displayLevel);
 	    sdlgr_relayout();
 #endif
@@ -720,7 +720,7 @@ cdb(message)
         results(STDOUT);
 #else
 #if defined(DOSTXTGRAPHX) || defined(DOSGRXGRAPHX) || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
       results(NULL);
 #else
       results(STDOUT);
@@ -800,13 +800,13 @@ cdb(message)
 #if defined(XWINGRAPHX)
       xWin_display_close(NOWAIT);
 #else
-#if defined(SDLGRAPHX)
+#if defined(SOFTGRAPHX)
       sdlgr_display_close(NOWAIT);
 #else
 #if defined(STDGRAPHX)
       stdio_display_close(NOWAIT);
 #endif /* STDGRAPHX */
-#endif /* SDLGRAPHX */
+#endif /* SOFTGRAPHX */
 #endif /* XWINGRAPHX */
 #endif /* LINUXGRAPHX */
 #endif /* MACGRAPHX */
@@ -848,7 +848,7 @@ cdb(message)
       }
       cdb_fputs((*targetview) (curAddr, outs), COND);
       break;
-#if !defined(__MAC__) && !defined(XWINGRAPHX) && !defined(SDLGRAPHX)
+#if !defined(__MAC__) && !defined(XWINGRAPHX) && !defined(SOFTGRAPHX)
     case SHE_H:                /* execute shell (command) */
     case SH_H:
 #if defined(DOSALLGRAPHX)
@@ -925,7 +925,7 @@ cdb(message)
       inCdb = FALSE;
       break;
 #if defined(DOSGRXGRAPHX) || defined(DOSTXTGRAPHX) || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
     case SWI_H:                /* switch display panels */
     case SW_H:
       if (*argStr && (start == stop) && ((start == 1) || (start == 2))) {
@@ -952,7 +952,7 @@ cdb(message)
 #if defined(XWINGRAPHX)
       xWin_update(i);
 #else
-#if defined(SDLGRAPHX)
+#if defined(SOFTGRAPHX)
       sdlgr_update(i);
 #else
 #if defined(STDGRAPHX)
@@ -960,7 +960,7 @@ cdb(message)
 #else
       grupdate(i);
 #endif                                /* STDGRAPHX */
-#endif                                /* SDLGRAPHX */
+#endif                                /* SOFTGRAPHX */
 #endif                                /* XWINGRAPHX */
 #endif                                /* LINUXGRAPHX */
 #endif                                /* DOSTXTGRAPHX */
@@ -1052,13 +1052,13 @@ cdb(message)
 #if defined(XWINGRAPHX)
   xWin_write_menu();
 #else
-#if defined(SDLGRAPHX)
+#if defined(SOFTGRAPHX)
   sdlgr_write_menu();
 #else
 #if defined(STDGRAPHX)
   stdio_write_menu();  
 #endif /* STDGRAPHX */
-#endif /* SDLGRAPHX */
+#endif /* SOFTGRAPHX */
 #endif /* XWINGRAPHX */
 #endif /* LINUXGRAPHX */
 #endif /* DOSGRXGRAPHX */
@@ -1168,7 +1168,7 @@ new_input:
     for (macroIdx = 0; macroTab[macroIdx]; ++macroIdx)
       macroCycle[macroIdx] = 0;
 #endif
-#if !defined(SDLGRAPHX) && !defined(STDGRAPHX)
+#if !defined(SOFTGRAPHX) && !defined(STDGRAPHX)
     cdb_fputs(prompt, FORCE);        /* display prompt */
 #endif
     conLine = FALSE;
@@ -1209,7 +1209,7 @@ new_input:
 #if defined(XWINGRAPHX)
       rv = xWin_gets(inputStr + i, MAXCMDSTR - i);
 #else
-#if defined(SDLGRAPHX)
+#if defined(SOFTGRAPHX)
       rv = sdlgr_gets(inputStr + i, MAXCMDSTR - i, prompt);
 #else
 #if defined(STDGRAPHX)
@@ -1217,7 +1217,7 @@ new_input:
 #else
       rv = fgets(inputStr + i, MAXCMDSTR - i + 1, stdin);
 #endif /* STDGRAPHX */
-#endif /* SDLGRAPHX */
+#endif /* SOFTGRAPHX */
 #endif /* XWINGRAPHX */
 #endif /* LINUXGRAPHX */
 #endif /* MACGRAPHX */
@@ -1249,7 +1249,7 @@ new_input:
     macroEnd = 0;
 #endif
   }                                /* if (! nextCmd) */
-#if defined(SDLGRAPHX)
+#if defined(SOFTGRAPHX)
   else
     sdlgr_refresh(curPanel);
 #else
@@ -1269,7 +1269,7 @@ new_input:
 #endif                                /* DOSALLGRAPHX */
 #endif                                /* DJGPP */
 #endif                                /* CURSESGRAPHX */
-#endif                                /* SDLGRAPHX */
+#endif                                /* SOFTGRAPHX */
   /* advance to next ~,! or \0 */
 advance:
   marking = 0;
@@ -1470,7 +1470,7 @@ cdb_fputs(str, wout)
 #if defined(XWINGRAPHX)
     xWin_puts(writeErrorDiskFull);
 #else
-#if defined(SDLGRAPHX)
+#if defined(SOFTGRAPHX)
     sdlgr_puts(writeErrorDiskFull);
 #else
 #if defined(STDGRAPHX)
@@ -1519,7 +1519,7 @@ cdb_fputs(str, wout)
     xWin_puts(str);
   printAttr = 0;
 #else
-#if defined(SDLGRAPHX)
+#if defined(SOFTGRAPHX)
     sdlgr_puts(str);
   printAttr = 0;
 #else
@@ -1693,7 +1693,7 @@ subst_eval(inpStr, result)
 #if defined(XWINGRAPHX)
     snprintf(outs, sizeof(outs), "%d", xWinTextLines);
 #else
-#if defined(SDLGRAPHX)
+#if defined(SOFTGRAPHX)
     snprintf(outs, sizeof(outs), "%d", sdlgr_text_lines());
 #else
 #if defined(STDGRAPHX)
@@ -1822,7 +1822,7 @@ help()
 #if defined(XWINGRAPHX)
   showLines = xWinTextLines - 1;
 #else
-#if defined(SDLGRAPHX)
+#if defined(SOFTGRAPHX)
   showLines = sdlgr_text_lines() - 1;
 #else
 #if defined(STDGRAPHX)
@@ -1873,7 +1873,7 @@ print_core(start, stop)
   int     count = 0;
   int     showLines;
 #if defined(DOSTXTGRAPHX) || defined(DOSGRXGRAPHX) || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
   int     i;
 #endif
 #if defined(DOSALLGRAPHX)
@@ -1891,7 +1891,7 @@ print_core(start, stop)
 #if defined(XWINGRAPHX)
   showLines = xWinTextLines - 1;
 #else
-#if defined(SDLGRAPHX)
+#if defined(SOFTGRAPHX)
   showLines = sdlgr_text_lines() - 1;
 #else
 #if defined(STDGRAPHX)
@@ -1917,7 +1917,7 @@ print_core(start, stop)
 #endif /* GRX */
 #endif /* ALL */
 #if defined(DOSTXTGRAPHX) || defined(DOSGRXGRAPHX) || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
   if (targetID == QUEUE && start == 0)
     printAttr = QW - warrior + 1;
   else if (targetID == WARRIOR && start == W - warrior)
@@ -1945,7 +1945,7 @@ print_core(start, stop)
         count = 0;
     }
 #if defined(DOSTXTGRAPHX) || defined(DOSGRXGRAPHX) || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
     if (targetID == QUEUE && start == 0)
       printAttr = QW - warrior + 1;
     else if (targetID == WARRIOR && start == W - warrior)
@@ -2359,7 +2359,7 @@ load_macros(fnStr)
         rv = xWin_gets(outs + i, MAXSTR - i);
       else
 #else
-#if defined(SDLGRAPHX)
+#if defined(SOFTGRAPHX)
       if (mfp == stdin)
         rv = sdlgr_gets(outs + i, MAXSTR - i, "");
       else
@@ -2369,7 +2369,7 @@ load_macros(fnStr)
         rv = stdio_gets(outs + i, MAXSTR - i, "");
       else
 #endif /* STDGRAPHX */
-#endif /* SDLGRAPHX */
+#endif /* SOFTGRAPHX */
 #endif /* XWINGRAPHX */
 #endif /* LINUXGRAPHX */
 #endif /* DOSGRXGRAPHX */
@@ -2472,7 +2472,7 @@ print_macros()
 #if defined(XWINGRAPHX)
   showLines = xWinTextLines - 1;
 #else
-#if defined(SDLGRAPHX)
+#if defined(SOFTGRAPHX)
   showLines = sdlgr_text_lines() - 1;
 #else
 #if defined(STDGRAPHX)
@@ -2714,7 +2714,7 @@ results(outp)
   }
 #else
 #if defined(DOSGRXGRAPHX) || defined(DOSTXTGRAPHX) || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
 #if defined(DOSGRXGRAPHX)
 #define OUTTEXT(s) grputs(s)
 #else
@@ -2724,7 +2724,7 @@ results(outp)
 #if defined(XWINGRAPHX)
 #define OUTTEXT(s) xWin_puts(s)
 #else
-#if defined(SDLGRAPHX)
+#if defined(SOFTGRAPHX)
 #define OUTTEXT(s) sdlgr_puts(s)
 #else
 #if defined(STDGRAPHX)

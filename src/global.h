@@ -345,7 +345,7 @@ extern int inCdb;
 extern int debugState;
 extern int copyDebugInfo;
 #if defined(DOSTXTGRAPHX) || defined(DOSGRXGRAPHX) || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
 extern int inputRedirection;
 #endif
 #if defined(XWINGRAPHX)
@@ -370,7 +370,7 @@ extern ADDR_T pSpaceSize;
 
 
 #if defined(DOSTXTGRAPHX) || defined(DOSGRXGRAPHX) || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
 
 #if !defined(LINUXGRAPHX)        /* vga.h already defines TEXT to be 0 */
 #define         TEXT 0
@@ -431,7 +431,7 @@ extern void reset_regs(void);
 extern void set_reg(char regChr, long val);
 
 #if defined(DOSTXTGRAPHX) || defined(DOSGRXGRAPHX) || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
 extern void decode_vopt(int option);
 #ifndef LINUXGRAPHX
 extern void grputs(char *str);
@@ -460,7 +460,7 @@ extern char *xWin_gets(char *s, int maxstr);
 extern void xWin_resize(void);
 #endif
 
-#if defined(SDLGRAPHX)
+#if defined(SOFTGRAPHX)
 void  sdlgr_clear_arena (void);
 void  sdlgr_refresh (int what);	/* -1: all, 0: core, >0 all text panels. */
 void  sdlgr_relayout ();
@@ -550,7 +550,7 @@ extern void xWin_resize();
 #if defined(STDGRAPHX)
 #error STDGRAPHX can only be compiled using an ANSI C compiler
 #endif
-#if defined(SDLGRAPHX)
-#error "SDLGRAPHX can only be compiled using an ANSI C compiler."
+#if defined(SOFTGRAPHX)
+#error "SOFTGRAPHX can only be compiled using an ANSI C compiler."
 #endif
 #endif

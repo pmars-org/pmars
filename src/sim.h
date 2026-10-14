@@ -71,7 +71,7 @@ extern int printAttr;
 #define         WAIT 1
 #define         NOWAIT 0
 #endif
-#ifdef SDLGRAPHX
+#ifdef SOFTGRAPHX
 extern int printAttr;
 #define         WAIT 1
 #define         NOWAIT 0
@@ -84,7 +84,7 @@ extern int printAttr;
 #endif
 
 #if defined(DOSTXTGRAPHX) || defined(DOSGRXGRAPHX) || defined(LINUXGRAPHX) \
-    || defined(XWINGRAPHX) || defined(SDLGRAPHX) || defined(STDGRAPHX)
+    || defined(XWINGRAPHX) || defined(SOFTGRAPHX) || defined(STDGRAPHX)
 #define         PC1_ATTR 1
 #define         PC2_ATTR 2
 #endif                                /* tells grputs that print_core() is printing

@@ -85,8 +85,12 @@ extern void sighandler(int dummy);
 #ifdef XWINGRAPHX
 #include "xwindisp.c"
 #else
-#ifdef SDLGRAPHX
+#ifdef SOFTGRAPHX
+#ifdef GDIGRAPHX
+#include "gdicore.c"
+#else
 #include "sdldisp.c"
+#endif
 #else
 #ifdef STDGRAPHX
 #include "stddisp.c"
@@ -436,7 +440,7 @@ if (IR.A_mode != (FIELD_T) IMMEDIATE)
 
 	if (IR.A_mode != (FIELD_T) DIRECT)
 	{
-		ADDR_T waddrA;		/* Stores core addr. of base ofs cell for */
+		ADDR_T waddrA = addrA;		/* Stores core addr. of base ofs cell for */
 					/*  predec/postinc modes. */
 
 		/* Computing the base offset cell's addr into tempPtr and the offset cell's
