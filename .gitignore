@@ -6,3 +6,5 @@
 /security/build/
 /build-sdl3/
 /build-sdl3-*/
+/dist/
+__pycache__/
