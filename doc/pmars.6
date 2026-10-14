@@ -262,6 +262,13 @@ If
 .I <fn>
 is a - (dash) standard input is parsed. Comments in the parameter file start
 with a semicolon.
+Bare filenames are searched first in the current directory, then in
+PMARSHOME (if set), then relative to the actual executable: ../config,
+../share/pmars, and the executable directory itself. A compiled-in
+PMARS_DATADIR, when configured, is the final fallback. The same search
+applies to debugger macro files, including pmars.mac. Explicit paths
+containing a directory separator or colon are opened exactly as supplied.
+No option preset is loaded unless requested with this switch.
 .TP
 .BI -=\ <string>
 The = (equal) option allows you to specify a custom score formula (see

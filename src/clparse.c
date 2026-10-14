@@ -324,7 +324,7 @@ clp_parse(clopt, filep)
                   newFile = stdin;
                   fprintf(stderr, "%s", readingStdin);
                 } else {
-                  if ((newFile = fopen(inputs, "r")) == NULL) {
+                  if ((newFile = pmars_open_config(inputs)) == NULL) {
                     code = FILENAME;        /* command file not found */
                     goto ERROR;
                   }
@@ -608,6 +608,7 @@ parse_param(largc, largv)
   }
 
   /*******************************************************************/
+  pmars_init_config_path(largv[0]);
   argv = largv;
   argc = largc;
   ++argv;

@@ -33,8 +33,8 @@ jobs:
             libudev-dev libdbus-1-dev libdrm-dev libgbm-dev libdecor-0-dev
       - name: Build server and run regression tests
         run: make -C src check
-      - name: Build console with debugger
-        run: make -C src default
+      - name: Test hardened console with debugger
+        run: make -C src check-console
       - name: Build SDL3 and run display regressions
         run: make -C src check-sdl
 
@@ -59,8 +59,8 @@ jobs:
             mingw-w64-ucrt-x86_64-sdl3
       - name: Build server and run regression tests
         run: mingw32-make -C src check
-      - name: Build console with debugger
-        run: mingw32-make -C src default
+      - name: Test hardened console with debugger
+        run: mingw32-make -C src check-console
       - name: Build GDI and run display regressions
         run: mingw32-make -C src check-gdi
       - name: Build SDL3 and run display regressions

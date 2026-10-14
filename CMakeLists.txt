@@ -59,7 +59,7 @@ else()
   endif()
 endif()
 set(PMARS_SOURCES src/pmars.c src/asm.c src/eval.c src/disasm.c src/cdb.c
-    src/sim.c src/pos.c src/clparse.c src/global.c src/token.c src/str_eng.c)
+    src/sim.c src/pos.c src/clparse.c src/configpath.c src/global.c src/token.c src/str_eng.c)
 add_executable(pmars-sdl3 ${PMARS_SOURCES} src/SDL_main.c)
 target_compile_definitions(pmars-sdl3 PRIVATE SDLGRAPHX EXT94 PERMUTATE)
 if(PMARS_STATIC)
@@ -98,4 +98,12 @@ endif()
 
 # Package managers install the executable; SDL3 remains their dependency.
 include(GNUInstallDirs)
+set(PMARS_DATADIR "${CMAKE_INSTALL_FULL_DATADIR}/pmars" CACHE PATH "Installed configuration lookup fallback")
+foreach(target pmars-sdl3 pmars-server pmars-sdl3-events)
+  if(TARGET ${target})
+    target_compile_definitions(${target} PRIVATE PMARS_DATADIR="${PMARS_DATADIR}")
+  endif()
+endforeach()
 install(TARGETS pmars-sdl3 RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(DIRECTORY config/ DESTINATION ${CMAKE_INSTALL_DATADIR}/pmars
+        FILES_MATCHING PATTERN "*.opt" PATTERN "*.mac")

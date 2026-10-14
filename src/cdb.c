@@ -2267,30 +2267,12 @@ wildsearch(pattern, target)
 }
 
 /*---------------------------------------------------------------------------
- open_macro_file() - open macro file taking into account $PMARSHOME envvar
+ open_macro_file() - use the shared installed configuration search path
  ---------------------------------------------------------------------------*/
 FILE *
 open_macro_file(char *filename)
 {
-	char *pmarshome;
-	char buf[1002];
-	FILE *fp = fopen(filename, "r");
-	if (!fp && filename[0] != DIR_SEPARATOR
-		&& (pmarshome = getenv("PMARSHOME")))
-	{
-		int namelen = strlen(filename);
-		int dirlen = strlen(pmarshome);
-		if (namelen + dirlen < 1000) {
-			strcpy(buf, pmarshome);
-			if (buf[dirlen-1] != DIR_SEPARATOR) {
-				buf[dirlen] = DIR_SEPARATOR;
-				buf[dirlen+1] = 0;
-			}
-			strcat(buf, filename);
-			fp = fopen(buf, "r");
-		}
-	}
-	return fp;
+    return pmars_open_config(filename);
 }
 
 /*---------------------------------------------------------------------------

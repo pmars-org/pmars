@@ -14,6 +14,7 @@
 #   make check-sdl-native  also test native SDL3 windows and input
 #   make xwin           enable X Windows graphics (UNIX)
 #   make check          run server regression tests (requires Python 3)
+#   make check-console  run hardened console and debugger regression tests
 #   make clean          remove objects and generated executables
 #                       (use before switching display builds)
 
@@ -29,6 +30,12 @@
 #   -DSAFECOLORS        use Okabe-Ito CVD-safe palette
 
 CFLAGS += -O2 -DEXT94 -DPERMUTATE
+
+# Optional absolute fallback for package managers with nonstandard layouts.
+# Use forward slashes in Windows paths.
+ifneq ($(strip $(PMARS_DATADIR)),)
+CONFIG_CPPFLAGS = "-DPMARS_DATADIR=\"$(PMARS_DATADIR)\""
+endif
 
 CC = gcc                # override with CC=clang, etc.
 CXX = g++
@@ -54,7 +61,7 @@ endif
 
 MAINFILE = pmars$(EXEEXT)
 SERVERFILE = pmars-server$(EXEEXT)
-SOURCES = pmars.c asm.c eval.c disasm.c cdb.c sim.c pos.c clparse.c global.c token.c str_eng.c
+SOURCES = pmars.c asm.c eval.c disasm.c cdb.c sim.c pos.c clparse.c configpath.c global.c token.c str_eng.c
 
 GDI_PROGRAM ?= pmars-gdi.exe
 GDI_EXTRA_CFLAGS ?= -std=c99 -fstack-protector-strong
@@ -90,7 +97,11 @@ JOBS ?= 8
 CMAKE_ARGS ?=
 SDL_CONFIGURE = "$(CMAKE)" -S .. -B "$(SDL_BUILD_DIR)" -G "$(CMAKE_GENERATOR)" -DCMAKE_MAKE_PROGRAM="$(MAKE)" -DCMAKE_C_COMPILER="$(strip $(CC))" -DCMAKE_CXX_COMPILER="$(strip $(CXX))" -DCMAKE_BUILD_TYPE="$(SDL_BUILD_TYPE)" -DPMARS_SDL_PROVIDER=$(SDL_PROVIDER) -DPMARS_STATIC=$(if $(filter static,$(SDL_LINK)),ON,OFF) -DPMARS_BUILD_EVENT_TESTS=OFF -DSDL3_SOURCE_DIR="$(if $(SDL_DIR),$(abspath $(SDL_DIR)))" -DCMAKE_C_FLAGS="$(CPPFLAGS) $(CFLAGS) $(SDL_EXTRA_CFLAGS)" -DCMAKE_EXE_LINKER_FLAGS="$(LDFLAGS)" $(CMAKE_ARGS)
 
-.PHONY: all help curses default sdl sdl3 gdi check-gdi check-sdl check-sdl3 check-sdl-native server check xwin clean
+ifneq ($(strip $(PMARS_DATADIR)),)
+SDL_CONFIGURE += "-DPMARS_DATADIR=$(PMARS_DATADIR)"
+endif
+
+.PHONY: all help curses default sdl sdl3 gdi check-gdi check-sdl check-sdl3 check-sdl-native server check check-console xwin clean
 
 all: help
 
@@ -110,6 +121,7 @@ help:
 	@echo "  make check-sdl-native  also test native SDL3 windows and input"
 	@echo "  make xwin           enable X Windows graphics (UNIX)"
 	@echo "  make check          run server regression tests (requires Python 3)"
+	@echo "  make check-console  run hardened console and debugger regressions"
 	@echo "  make clean          remove objects and generated executables"
 	@echo "                      (use before switching display builds)"
 
@@ -125,7 +137,7 @@ check-sdl3: check-sdl
 # Always compile the whole GDI variant: no objects leak between backends.
 gdi:
 ifneq (,$(EXEEXT))
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(GDI_EXTRA_CFLAGS) -DGDIGRAPHX $(CORE_SOURCES) gdidisp.c $(LDFLAGS) $(GDI_LDFLAGS) $(GDI_LIBS) -o "$(GDI_PROGRAM)"
+	$(CC) $(CPPFLAGS) $(CONFIG_CPPFLAGS) $(CFLAGS) $(GDI_EXTRA_CFLAGS) -DGDIGRAPHX $(CORE_SOURCES) gdidisp.c $(LDFLAGS) $(GDI_LDFLAGS) $(GDI_LIBS) -o "$(GDI_PROGRAM)"
 else
 	$(error GDI requires a Windows-targeting compiler; use make sdl)
 endif
@@ -158,7 +170,13 @@ check-sdl-native: check-sdl
 # Compile all server sources together on every request: changing flags or
 # switching from a display build must never reuse incompatible object files.
 server:
-	$(CC) $(CPPFLAGS) $(CFLAGS) -std=c99 -DSERVER $(HARDEN_CFLAGS) $(SOURCES) $(LDFLAGS) $(HARDEN_LDFLAGS) -o $(SERVERFILE)
+	$(CC) $(CPPFLAGS) $(CONFIG_CPPFLAGS) $(CFLAGS) -std=c99 -DSERVER $(HARDEN_CFLAGS) $(SOURCES) $(LDFLAGS) $(HARDEN_LDFLAGS) -o $(SERVERFILE)
+
+check-console: default server
+	$(PYTHON) ../security/test_security.py ./$(MAINFILE) ./$(SERVERFILE)
+	$(PYTHON) ../security/test_096.py ./$(MAINFILE)
+	$(PYTHON) ../security/test_console.py ./$(MAINFILE) ./$(SERVERFILE)
+	$(PYTHON) ../security/test_configpath.py ./$(MAINFILE) ./$(SERVERFILE)
 
 check: server
 	$(PYTHON) ../security/test_security.py ./$(SERVERFILE)
@@ -171,11 +189,11 @@ xwin: CFLAGS += -DXWINGRAPHX
 xwin: LIBS = -L/usr/X11R6/lib -lX11
 xwin: $(MAINFILE)
 
-OBJ = pmars.o asm.o eval.o disasm.o cdb.o sim.o pos.o clparse.o global.o token.o str_eng.o
+OBJ = pmars.o asm.o eval.o disasm.o cdb.o sim.o pos.o clparse.o configpath.o global.o token.o str_eng.o
 
 $(MAINFILE): $(OBJ)
 	@echo Linking $@
-	@$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
+	@$(CC) $(LDFLAGS) $(HARDEN_LDFLAGS) -o $@ $^ $(LIBS)
 	@strip $@
 	@echo Done
 
@@ -193,7 +211,7 @@ $(OBJ): Makefile config.h global.h
 
 %.o: %.c
 	@echo Compiling $<
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+	$(CC) $(CPPFLAGS) $(CONFIG_CPPFLAGS) $(CFLAGS) $(HARDEN_CFLAGS) -c $< -o $@
 
 clean:
 ifeq ($(OS),Windows_NT)
