@@ -27,6 +27,8 @@
 
 #include "config.h"
 #include <stdio.h>
+extern void pmars_init_config_path(const char *program);
+extern FILE *pmars_open_config(const char *name);
 #ifndef INT_MAX
 #include <limits.h>
 #endif

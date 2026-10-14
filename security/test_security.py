@@ -89,7 +89,7 @@ with tempfile.TemporaryDirectory(prefix='pmars-security-', dir=ROOT / 'security'
     source.write_text(';redcode\n;assert 1\ndat 0,0\n')
     check(run(['-@', options, source]), 0, 'long option comment')
     source.write_text(';redcode\n;assert 1\n;debug\ndat 0,0\n')
-    check(run(['-b', '-r', '1', source, source], stdin=b'\n'), 0, 'SERVER ignores submission debugger directives')
+    check(run(['-b', '-r', '1', source, source], stdin=b'\n'), 0, 'debugger directives with redirected EOF terminate cleanly')
     source.write_text(';redcode\n;assert 1\n' + 'dat 999999,999999\n' * 1000)
     check(run(['-b', '-k', '-f', '-r', '1', '-s', '1000000', '-l', '1000', source, source]),
           0, 'warrior checksum wraps safely')

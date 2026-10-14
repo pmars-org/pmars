@@ -23,10 +23,15 @@ restore register assignments; arithmetic overflow rejects the expression.
 These budgets are not a total CPU, memory or output sandbox.
 
 Build from `src` with `make server`; run the regression suite with `make check`.
+For the console with cdb, use `make default` and `make check-console`.
 On Windows the GNU Make executable may be named `mingw32-make`. Python 3 is
 required only for the tests, not for building or running pMARS. The server
-build adds compiler/linker hardening and writes `pmars-server` (`.exe` on
-Windows), separately from interactive/display builds. SERVER/display combinations
+build writes `pmars-server` (`.exe` on Windows). The default console build
+uses the same compiler/linker hardening flags: stack protection, Windows
+ASLR/DEP, or fortification and PIE on Unix with RELRO/NOW on Linux.
+Source-level input protections apply to both builds. The console retains cdb,
+including activation through warrior debug directives; the server disables it
+for unattended tournaments. SERVER/display combinations
 fail at compile time. The default follows the candidate and does not enable
 RWLIMIT. Enable simulated read/write limits with an explicit CFLAGS override;
 host input hardening is independent of that simulator feature.

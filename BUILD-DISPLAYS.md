@@ -5,7 +5,7 @@ many Windows installations. Plain `make` prints the available targets.
 
 | Command | Result | Requirements |
 | --- | --- | --- |
-| `make default` | Console with debugger: `pmars` | C compiler and GNU Make |
+| `make default` | Hardened console with debugger: `pmars` | C compiler and GNU Make |
 | `make server` | Hardened headless simulator: `pmars-server` | C compiler and GNU Make |
 | `make gdi` | Native Windows display: `pmars-gdi.exe` | 64-bit MinGW-w64 GCC and GNU Make |
 | `make sdl` (or `make sdl3`) | Portable SDL3 display: `pmars-sdl3` | C/C++ compilers, GNU Make, CMake 3.21+ |
@@ -35,6 +35,8 @@ build directory. Run `make clean` before switching between the legacy
 ## Tests
 
 - `make check`: headless security, compatibility and expression tests.
+- `make check-console`: console security and compatibility tests, battle parity
+  against the server, and console/server debugger behavior checks.
 - `make check-gdi`: GDI security, assembler, battle parity, debugger and
   surface tests. This opens short-lived Windows windows.
 - `make check-sdl`: SDL3 security, assembler, battle parity, debugger and
@@ -43,10 +45,40 @@ build directory. Run `make clean` before switching between the legacy
 - `make check-sdl-native`: additionally exercises native SDL3 windows/input.
 
 Python 3 runs the harnesses; Windows SDL3 import checks also use MinGW objdump.
-GitHub Actions runs headless and display regressions on Linux and Windows
+GitHub Actions runs headless, console and display regressions on Linux and Windows
 (GDI only on Windows). Native SDL3 desktop checks are run manually.
 
 ## Run
+
+### Finding option files and debugger macros
+
+For example, `pmars -@ nano.opt warrior1.red warrior2.red` works from any
+working directory when the executable is on PATH and the presets are installed
+in one of the locations below. Bare filenames for `-@` and cdb macro files
+(including `pmars.mac`) are searched in this order:
+
+1. The current working directory.
+2. `PMARSHOME`, if set to a nonempty directory.
+3. `<executable-directory>/../config` (portable ZIP or source-tree builds).
+4. `<executable-directory>/../share/pmars` (standard package layout).
+5. The executable directory itself (flat portable packages).
+6. The compiled `PMARS_DATADIR`, if configured.
+
+The actual executable location is used, independently of the current directory;
+Linux/macOS symlinks resolve to the installed executable. Windows launchers such
+as Chocolatey shims therefore use the program's own directory, not the shim's.
+Names containing a directory separator or colon are treated as explicit paths
+and are never searched elsewhere. Unreadable files do not silently fall back
+to a different preset. Nested `-@` includes use the same lookup, with the
+existing depth limit. Warrior filenames retain their existing path behavior.
+No option preset is loaded automatically: select it with `-@ filename.opt`.
+
+CMake installs the `.opt` and `.mac` files to `${CMAKE_INSTALL_DATADIR}/pmars`
+and compiles `${CMAKE_INSTALL_FULL_DATADIR}/pmars` as the last fallback.
+Package recipes can override `-DPMARS_DATADIR=/custom/share/pmars`; configure
+the final install prefix before building and use DESTDIR for staging.
+GNU Make builds can set `PMARS_DATADIR=/custom/share/pmars` too; clean existing
+objects when changing this setting. Use forward slashes for Windows paths.
 
 From the repository root on Windows:
 
@@ -105,7 +137,8 @@ cmake --build build-package --target pmars-sdl3
 DESTDIR="$pkgdir" cmake --install build-package
 ```
 
-The install rule installs `bin/pmars-sdl3`; the package supplies SDL3 as a
+The install rule installs `bin/pmars-sdl3` and the option/macro files under
+`share/pmars` (or the configured GNUInstallDirs paths); the package supplies SDL3 as a
 runtime dependency. Use `CMAKE_PREFIX_PATH` or CMake's `SDL3_DIR` to locate
 an SDK outside the normal search paths. With make, pass these through
 `CMAKE_ARGS`. `SDL_DIR` is only for source trees in bundled mode.
