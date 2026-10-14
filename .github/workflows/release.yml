@@ -1,0 +1,181 @@
+name: Build release binaries
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Package matching source
+        run: |
+          python scripts/test_release_tools.py
+          python scripts/package_release.py package --platform source
+          python scripts/test_release_package.py --platform source
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-input-source
+          path: dist/*.zip
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: true
+
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x64
+            os: windows-2022
+            shell: 'msys2 {0}'
+            make: mingw32-make
+            cc: gcc
+            cxx: g++
+            ldflags: -static
+          - platform: linux-x64
+            os: ubuntu-22.04
+            shell: bash
+            make: make
+            cc: gcc
+            cxx: g++
+            ldflags: ''
+          - platform: macos-arm64
+            os: macos-15
+            shell: bash
+            make: make
+            cc: clang
+            cxx: clang++
+            ldflags: ''
+          - platform: macos-x64
+            os: macos-15-intel
+            shell: bash
+            make: make
+            cc: clang
+            cxx: clang++
+            ldflags: ''
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    env:
+      SDL_VIDEO_DRIVER: dummy
+      MACOSX_DEPLOYMENT_TARGET: '11.0'
+      BUILD_MAKE: ${{ matrix.make }}
+      BUILD_CC: ${{ matrix.cc }}
+      BUILD_CXX: ${{ matrix.cxx }}
+      BUILD_LDFLAGS: ${{ matrix.ldflags }}
+      PACKAGE_PLATFORM: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        if: runner.os != 'Windows'
+        with:
+          python-version: '3.13'
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            git
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-make
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-cmake
+      - name: Install Linux SDL development libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake pkg-config \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev \
+            libxfixes-dev libxss-dev libxtst-dev libxkbcommon-dev libwayland-dev \
+            libegl1-mesa-dev libgl1-mesa-dev libasound2-dev libpulse-dev \
+            libudev-dev libdbus-1-dev libdrm-dev libgbm-dev libdecor-0-dev
+      - name: Build and test console, server and bundled SDL3
+        run: |
+          "$BUILD_MAKE" -C src check check-console check-sdl \
+            CC="$BUILD_CC" CXX="$BUILD_CXX" PYTHON=python \
+            CFLAGS='-O2 -std=c99 -DEXT94 -DPERMUTATE' \
+            LDFLAGS="$BUILD_LDFLAGS" JOBS=3
+      - name: Build and test native Windows GDI
+        if: runner.os == 'Windows'
+        run: |
+          "$BUILD_MAKE" -C src check-gdi PYTHON=python LDFLAGS=-static
+      - name: Package and test the extracted distribution
+        run: |
+          python scripts/package_release.py package --platform "$PACKAGE_PLATFORM"
+          python scripts/test_release_package.py --platform "$PACKAGE_PLATFORM"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-input-${{ matrix.platform }}
+          path: dist/*.zip
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: true
+
+  collect:
+    name: Verify release set and calculate checksums
+    needs: [source, build]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-input-*
+          path: dist
+          merge-multiple: true
+      - name: Require all five matching archives
+        run: python scripts/package_release.py checksums
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-downloads
+          path: dist/*
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: true
+
+  publish:
+    name: Publish tagged release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: collect
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-downloads
+          path: dist
+      - name: Create release with all verified assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          flags=()
+          if [[ "$RELEASE_TAG" == *-* ]]; then flags+=(--prerelease); fi
+          gh release create "$RELEASE_TAG" dist/*.zip dist/SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes \
+            --title "pMARS AI $RELEASE_TAG" "${flags[@]}"

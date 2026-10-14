@@ -52,3 +52,7 @@ GDI and SDL3 builds
 
     See BUILD-DISPLAYS.md for make gdi, make sdl and regression test commands.
     The original console, server, curses and X Windows targets remain available.
+
+    Binary release packages include executables in bin/, with the matching
+    source, warriors and config files. See RELEASING.md for automated GitHub
+    builds, downloads and version-tagged releases.
