@@ -3,6 +3,9 @@
 ;use pmars -@ tinylp.opt file1 [files...]
 
 -s 800         ;coresize
--p 800         ;max. proc.
--c 8           ;cycles
+-p 8           ;max. processes
+-c 8000        ;cycles
 -l 50          ;warrior length
+-d 50          ;minimum separation
+-S 50          ;p-space size
+-r 250         ;rounds
