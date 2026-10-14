@@ -925,6 +925,21 @@ Sunlock(SDL_Surface *screen)
  * failure returns NULL.  On success, remaps the colours in Colours[] to
  * the display native format as a side-effect.
  **/
+/* SDL window coordinates and framebuffer pixels differ on high-density
+ * displays. Convert logical UI pixels to window coordinates, not pixel density
+ * alone (on Windows density is 1 even at 150% desktop scaling). */
+static float window_ui_scale(void)
+{
+    float scale = SDL_GetWindowDisplayScale(TheWindow);
+    float density = SDL_GetWindowPixelDensity(TheWindow);
+    return scale > 0 && density > 0 ? scale / density : 1.0f;
+}
+
+static int scaled_dimension(int value, float scale)
+{
+    return max(1, (int)(value * scale + 0.5f));
+}
+
 static SDL_Surface *
 set_VMode(VMode* m)
 {
@@ -933,7 +948,7 @@ set_VMode(VMode* m)
     if (!TheWindow) {
         SDL_Surface *icon;
         int x, y;
-        TheWindow = SDL_CreateWindow("pMARS", m->w, m->h, m->flags);
+        TheWindow = SDL_CreateWindow("pMARS", m->w, m->h, m->flags | SDL_WINDOW_HIGH_PIXEL_DENSITY);
         if (!TheWindow) return NULL;
         /* Expand the historical MSB-first monochrome icon into RGB pixels. */
         icon = SDL_CreateSurface(pmarsicn_width, pmarsicn_height, SDL_PIXELFORMAT_XRGB8888);
@@ -949,10 +964,14 @@ set_VMode(VMode* m)
         }
         if (!SDL_StartTextInput(TheWindow))
             exit_panic(errDisplayOpen, SDL_GetError());
-    } else if (!(SDL_GetWindowFlags(TheWindow) & SDL_WINDOW_FULLSCREEN)) {
+    }
+    if (!(SDL_GetWindowFlags(TheWindow) & SDL_WINDOW_FULLSCREEN)) {
         int w, h;
+        float scale = window_ui_scale();
+        int desired_w = scaled_dimension(m->w, scale);
+        int desired_h = scaled_dimension(m->h, scale);
         SDL_GetWindowSize(TheWindow, &w, &h);
-        if ((w != m->w || h != m->h) && !SDL_SetWindowSize(TheWindow, m->w, m->h))
+        if ((w != desired_w || h != desired_h) && !SDL_SetWindowSize(TheWindow, desired_w, desired_h))
             return NULL;
     }
     /* Own this buffer. SDL owns the window surface and may replace it on resize. */
@@ -3325,10 +3344,25 @@ default_handler(SDL_Event *e)
 {
     switch (e->type) {
     case SDL_EVENT_WINDOW_RESIZED:
-	if (e->window.data1 > 0 && e->window.data2 > 0)
-            relayout(min(8192, e->window.data1), min(8192, e->window.data2));
+	if (e->window.data1 > 0 && e->window.data2 > 0) {
+            int w, h;
+            /* Query current size: queued resize events may predate a DPI change. */
+            SDL_GetWindowSize(TheWindow, &w, &h);
+            relayout(min(8192, scaled_dimension(w, 1.0f/window_ui_scale())),
+                     min(8192, scaled_dimension(h, 1.0f/window_ui_scale())));
+        }
 	present_display();
 	break;
+    case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+        if (!(SDL_GetWindowFlags(TheWindow) & SDL_WINDOW_FULLSCREEN)) {
+            float scale = window_ui_scale();
+            if (!SDL_SetWindowSize(TheWindow, scaled_dimension(TheVMode.w, scale),
+                                   scaled_dimension(TheVMode.h, scale)))
+                exit_panic(errDisplayOpen, SDL_GetError());
+        }
+        present_display();
+        break;
+    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
     case SDL_EVENT_WINDOW_EXPOSED:
         /* The owned buffer survives exposure; keep debugger output intact. */
         present_display();
@@ -3545,7 +3579,12 @@ sdlgr_gets(char *buf, int maxbuf, const char *prompt)
 	refresh_layout(TextPanels[i]->layout);
     }
 
-    SDL_WarpMouseInWindow(TheWindow, xkoord(curAddr), ykoord(curAddr));
+    {
+        int w, h;
+        SDL_GetWindowSize(TheWindow, &w, &h);
+        SDL_WarpMouseInWindow(TheWindow, (float)xkoord(curAddr)*w/TheSurf->w,
+                             (float)ykoord(curAddr)*h/TheSurf->h);
+    }
 
     /* Process events until we have input to pass back. */
     while (!done) {
@@ -3564,8 +3603,10 @@ sdlgr_gets(char *buf, int maxbuf, const char *prompt)
 	    /* Accept mouse input and update curAddr only if the click
 	     * is inside core. */
 	    if (done) {
-		int x = e->button.x;
-		int y = e->button.y;
+		int w, h, x, y;
+                SDL_GetWindowSize(TheWindow, &w, &h);
+                x = w > 0 ? (int)(e->button.x * TheSurf->w / w) : -1;
+                y = h > 0 ? (int)(e->button.y * TheSurf->h / h) : -1;
 		if (x >= ArenaX && y >= ArenaY)
 		{
 		    int col = (x-ArenaX)/CellSize;

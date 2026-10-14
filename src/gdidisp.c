@@ -16,6 +16,7 @@ static HWND window;
 static SDL_Surface *screen;
 static char error_text[256];
 static int changing_mode, fullscreen;
+static UINT window_dpi = 96;
 static DWORD window_style;
 static RECT saved_window;
 static SDL_Event events[256];
@@ -204,15 +205,26 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     }
     case WM_ERASEBKGND:return 1;
     case WM_CLOSE:e.type=SDL_QUIT; queue_event(e); return 0;
+    case WM_DPICHANGED: {
+        RECT *r = (RECT *)lp;
+        window_dpi = HIWORD(wp);
+        changing_mode = 1;
+        SetWindowPos(hwnd, NULL, r->left, r->top, r->right-r->left,
+                     r->bottom-r->top, SWP_NOZORDER|SWP_NOACTIVATE);
+        changing_mode = 0;
+        InvalidateRect(hwnd, NULL, FALSE);
+        return 0;
+    }
     case WM_SIZE:
         if(!changing_mode && wp!=SIZE_MINIMIZED && LOWORD(lp) && HIWORD(lp)) {
-            e.type=SDL_VIDEORESIZE; e.resize.w=LOWORD(lp); e.resize.h=HIWORD(lp);
+            e.type=SDL_VIDEORESIZE; e.resize.w=MulDiv(LOWORD(lp),96,window_dpi);
+            e.resize.h=MulDiv(HIWORD(lp),96,window_dpi);
             queue_event(e);
         }
         return 0;
     case WM_GETMINMAXINFO:
-        ((MINMAXINFO *)lp)->ptMinTrackSize.x=320;
-        ((MINMAXINFO *)lp)->ptMinTrackSize.y=240;
+        ((MINMAXINFO *)lp)->ptMinTrackSize.x=MulDiv(320,window_dpi,96);
+        ((MINMAXINFO *)lp)->ptMinTrackSize.y=MulDiv(240,window_dpi,96);
         return 0;
     case WM_KEYDOWN:case WM_SYSKEYDOWN:
         if(msg==WM_SYSKEYDOWN && wp==VK_F4) break; /* Native Alt+F4 close. */
@@ -256,7 +268,9 @@ int SDL_Init(Uint32 flags)
     if(!RegisterClassW(&wc) && GetLastError()!=ERROR_CLASS_ALREADY_EXISTS) {
         win_error("RegisterClass"); return -1;
     }
-    SetProcessDPIAware();
+    /* Window sizes are logical 96-DPI pixels; the framebuffer stays logical. */
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    window_dpi = GetDpiForSystem();
     return 0;
 }
 
@@ -287,21 +301,29 @@ static void set_fullscreen(int enabled)
 SDL_Surface *SDL_SetVideoMode(int w,int h,int bpp,Uint32 flags)
 {
     SDL_Surface *s=SDL_CreateRGBSurface(flags & ~(SDL_HWSURFACE|SDL_DOUBLEBUF),w,h,bpp,0,0,0,0);
-    RECT r={0,0,w,h},client;
+    RECT r={0,0,0,0},client;
     DWORD style=WS_OVERLAPPEDWINDOW;
     if(!s) return NULL;
     changing_mode=1;
     if(!(flags & SDL_RESIZABLE)) style &= ~(WS_THICKFRAME|WS_MAXIMIZEBOX);
     if(flags & SDL_NOFRAME) style=WS_POPUP;
-    AdjustWindowRect(&r,style,FALSE);
+    if(window) window_dpi=GetDpiForWindow(window);
+    r.right=MulDiv(w,window_dpi,96); r.bottom=MulDiv(h,window_dpi,96);
+    AdjustWindowRectExForDpi(&r,style,FALSE,0,window_dpi);
     if(!window) {
         window=CreateWindowExW(0,window_class,L"pMARS - Win32/GDI",style,
                               CW_USEDEFAULT,CW_USEDEFAULT,r.right-r.left,r.bottom-r.top,
                               NULL,NULL,GetModuleHandleW(NULL),NULL);
         if(!window) { win_error("CreateWindow"); SDL_FreeSurface(s); changing_mode=0; return NULL; }
-    } else if(!fullscreen) {
+    }
+    if(!fullscreen) {
+        /* The default placement may choose a monitor with a different DPI. */
+        window_dpi=GetDpiForWindow(window);
+        r.left=r.top=0;
+        r.right=MulDiv(w,window_dpi,96); r.bottom=MulDiv(h,window_dpi,96);
+        AdjustWindowRectExForDpi(&r,style,FALSE,0,window_dpi);
         GetClientRect(window,&client);
-        if(client.right!=w || client.bottom!=h)
+        if(client.right!=MulDiv(w,window_dpi,96) || client.bottom!=MulDiv(h,window_dpi,96))
             SetWindowPos(window,NULL,0,0,r.right-r.left,r.bottom-r.top,SWP_NOMOVE|SWP_NOZORDER);
     }
     screen=s;

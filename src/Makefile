@@ -136,6 +136,8 @@ check-gdi: gdi server
 	$(PYTHON) -c "from pathlib import Path; Path('../security/build').mkdir(parents=True, exist_ok=True)"
 	$(CC) -std=c99 -O2 -Wall -Wextra -Werror ../security/test_gdi_surface.c gdidisp.c $(GDI_LDFLAGS) $(GDI_LIBS) -o ../security/build/test-gdi-surface.exe
 	$(PYTHON) -c "import subprocess; subprocess.run(['../security/build/test-gdi-surface.exe'], check=True)"
+	$(CC) -std=c99 -O2 -Wall -Wextra -Werror ../security/test_gdi_dpi.c $(GDI_LDFLAGS) $(GDI_LIBS) -o ../security/build/test-gdi-dpi.exe
+	$(PYTHON) -c "import subprocess; subprocess.run(['../security/build/test-gdi-dpi.exe'], check=True)"
 
 # Isolated CMake output prevents reuse of another display backend's objects.
 # The default embeds SDL3; SDL_PROVIDER=system uses the installed package.

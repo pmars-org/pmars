@@ -120,3 +120,12 @@ security/compatibility, 18 SDL mode/debugger, 7 assembler and dummy event
 checks passed; the executable imports SDL3.dll. The install rule staged
 only bin/pmars-sdl3.exe. Missing-SDK configuration failed without extracting
 the bundled archive. The default bundled-static suite also passed again.
+
+## High-DPI displays
+
+GDI and SDL3 scale the bitmap UI to the desktop display scale. At 150%,
+`-m 640x480` requests a 960x720-pixel client area on Windows, while retaining
+640x480 logical drawing coordinates. Text, core cells and mouse input scale
+together. Resizing changes the logical layout; moving between displays updates
+the scale. The historical bitmap font uses nearest-neighbor enlargement, so
+fractional scales can produce uneven pixel widths.

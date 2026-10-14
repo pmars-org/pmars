@@ -34,9 +34,13 @@ static void sdl3_event_tests(void)
     SDL_Event e;
     SDL_KeyboardEvent key;
     char buf[MAXALLCHAR];
-    int i, coloured = 0, oldspeed;
+    int i, coloured = 0, oldspeed, window_w, window_h;
     const char *exit_test = SDL_getenv("PMARS_SDL3_EXIT_TEST");
     inputRedirection = 0;
+    SDL_GetWindowSize(TheWindow, &window_w, &window_h);
+    test_require(window_w == scaled_dimension(TheSurf->w, window_ui_scale()) &&
+                 window_h == scaled_dimension(TheSurf->h, window_ui_scale()),
+                 "DPI-scaled initial window with logical framebuffer");
     SDL_FlushEvents(SDL_EVENT_FIRST, SDL_EVENT_LAST);
     if (exit_test) {
         SDL_zero(e); SDL_zero(key);
@@ -76,7 +80,10 @@ static void sdl3_event_tests(void)
     sdlgr_update(2); sdlgr_update(0);
     test_require(NTextPanels == 1 && curPanel == 1, "close panel");
     SDL_zero(e); e.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
-    e.button.button = 1; e.button.x = ArenaX + CellSize; e.button.y = ArenaY;
+    SDL_GetWindowSize(TheWindow, &window_w, &window_h);
+    e.button.button = 1;
+    e.button.x = (ArenaX + CellSize + 0.5f) * window_w / TheSurf->w;
+    e.button.y = (ArenaY + 0.5f) * window_h / TheSurf->h;
     test_require(SDL_PushEvent(&e), "queue mouse");
     test_input(" m mousel\n"); test_require(curAddr == 1, "mouse core address");
     /* Exercise pixel writes, bitmap fonts, sprite colours, scroll and resize. */
@@ -96,6 +103,19 @@ static void sdl3_event_tests(void)
         if (((unsigned char *)TheSurf->pixels)[i]) ++coloured;
     test_require(coloured > 1000, "nonempty framebuffer");
     test_require(SDL_SaveBMP(TheSurf, "sdl3-events.bmp"), "save graphics evidence");
+    /* Real resize at the monitor's scale, plus stale resize events. */
+    test_require(SDL_SetWindowSize(TheWindow,
+                 scaled_dimension(900, window_ui_scale()),
+                 scaled_dimension(700, window_ui_scale())), "resize scaled window");
+    SDL_SyncWindow(TheWindow);
+    SDL_zero(e); e.type = SDL_EVENT_WINDOW_RESIZED;
+    e.window.data1 = 1; e.window.data2 = 1;
+    default_handler(&e);
+    test_require(TheSurf->w == 900 && TheSurf->h == 700,
+                 "resize uses current logical size, not stale event");
+    e.type = SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED; default_handler(&e);
+    test_require(TheSurf->w == 900 && TheSurf->h == 700,
+                 "scale change preserves logical framebuffer");
     /* Real event handler, and real native resize/expose event queue. */
     SDL_zero(e); e.type = SDL_EVENT_WINDOW_EXPOSED; default_handler(&e);
     for (i = 0; i < 20; ++i) {
