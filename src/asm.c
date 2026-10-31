@@ -2277,7 +2277,7 @@ assemble(fName, aWarrior)
     spnt = 1 - spnt;
     pass++;
 
-    if (noassert)
+    if (noassert && !SWITCH_b)
       errprn(NASERR, (line_st *) NULL, "");
 
     if (SWITCH_V) {

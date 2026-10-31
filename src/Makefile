@@ -9,7 +9,7 @@
 #   make curses         enable Curses display (UNIX)
 #   make sdl            enable SDL graphics (generic)
 #   make sdlwin         enable SDL graphics (Windows, MinGW, console output)
-#   make xwin          enable X Windows graphics (UNIX)
+#   make xwin           enable X Windows graphics (UNIX)
 #   make clean          remove all *.o (recommended when changing
 #                       CFLAGS in Makefile or switching build version)
 
