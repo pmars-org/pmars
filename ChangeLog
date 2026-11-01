@@ -1,5 +1,5 @@
 
-2026-06-03	John Metcalf	<digital.wilderness@googlemail.com>
+2026-10-31	John Metcalf	<digital.wilderness@googlemail.com>
 
 	- Release 0.9.6 candidate
 	- Merged SDL display support from pMARS-SDL.
@@ -9,8 +9,13 @@
 	  reported by anr on Discord.
 	- Read/write limits are now disabled by default.
         - PIN security fix: a challenger using PIN 0 could access the
-          opponent's p-space - reported by Fractality on Discord.
-
+          opponent's p-space - reported by Bjoern Guenzel on Discord.
+        - Correct parameters for max proc and cycles in tinylp.opt -
+          updated by Bjoern Guenzel.
+        - Fixed RC5 ROL / ROR macros for the alternative RC5 PRNG.
+        - Added sdlwin Makefile target for Windows - updated by
+          Jason Henriksen.
+        - Suppress missing assert warning in brief mode.
 
 2026-01-03	John Metcalf	<digital.wilderness@googlemail.com>
 
