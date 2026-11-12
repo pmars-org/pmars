@@ -41,7 +41,7 @@ all:
 	@echo "  make curses         enable Curses display (UNIX)"
 	@echo "  make sdl            enable SDL graphics (generic)"
 	@echo "  make sdlwin         enable SDL graphics (Windows, MinGW, console output)"
-	@echo "  make xwin          enable X Windows graphics (UNIX)"
+	@echo "  make xwin           enable X Windows graphics (UNIX)"
 	@echo "  make clean          remove all *.o (recommended when changing"
 	@echo "                      CFLAGS in Makefile or switching build version)"
 
