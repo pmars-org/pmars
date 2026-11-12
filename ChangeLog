@@ -1,5 +1,5 @@
 
-2026-10-31	John Metcalf	<digital.wilderness@googlemail.com>
+2026-11-12	John Metcalf	<digital.wilderness@googlemail.com>
 
 	- Release 0.9.6 candidate
 	- Merged SDL display support from pMARS-SDL.
@@ -16,6 +16,7 @@
         - Added sdlwin Makefile target for Windows - updated by
           Jason Henriksen.
         - Suppress missing assert warning in brief mode.
+        - Curses display updated to compile with modern ncurses (6.0+)
 
 2026-01-03	John Metcalf	<digital.wilderness@googlemail.com>
 
