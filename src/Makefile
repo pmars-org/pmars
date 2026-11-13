@@ -83,7 +83,7 @@ sim.o cdb.o pos.o disasm.o: sim.h
 
 sim.o: curdisp.c uidisp.c sdldisp.c xwindisp.c
 
-sdldisp.c: pmarsicnsdl.h
+sdldisp.c: pmarsicnsdl.h fnt16.c
 
 xwindisp.c: xwindisp.h pmarsicn.h
 
